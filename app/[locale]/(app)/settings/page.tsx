@@ -2,13 +2,14 @@ import { ShieldCheck } from "lucide-react";
 import { SecurityCard } from "@/components/features/profile/security-card";
 import { hasCredentialPassword } from "@/lib/queries/users";
 import { getTranslations } from "next-intl/server";
-import { Bell, Languages, TriangleAlert, UserCog } from "lucide-react";
+import { Bell, Eye, Languages, TriangleAlert, UserCog } from "lucide-react";
 
 import { requireOnboarded } from "@/lib/session";
 import { getLocationTrail } from "@/lib/queries/locations";
 import { getBlockedUsers, getNotificationPrefs } from "@/lib/queries/users";
 import { PageHeader } from "@/components/features/shared/page-header";
 import { ProfileEditForm } from "@/components/features/profile/profile-edit-form";
+import { PrivacyForm } from "@/components/features/profile/privacy-form";
 import { NotificationPrefsForm } from "@/components/features/profile/notification-prefs-form";
 import { LanguageForm } from "@/components/features/profile/language-form";
 import { BlockedList } from "@/components/features/profile/blocked-list";
@@ -52,7 +53,7 @@ export default async function SettingsPage() {
         <Card id="profile">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
-              <UserCog className="size-4 text-primary" aria-hidden />
+              <UserCog className="text-primary size-4" aria-hidden />
               {tp("editTitle")}
             </CardTitle>
           </CardHeader>
@@ -73,10 +74,33 @@ export default async function SettingsPage() {
       </FadeUp>
 
       <FadeUp>
+        <Card id="privacy">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Eye className="text-primary size-4" aria-hidden />
+              {t("privacy")}
+            </CardTitle>
+            <p className="text-muted-foreground text-xs">{t("privacyHint")}</p>
+          </CardHeader>
+          <CardContent>
+            <PrivacyForm
+              initial={{
+                profileVisibility: user.profileVisibility as
+                  "members" | "circles" | "hidden",
+                showGender: user.showGender,
+                showAge: user.showAge,
+                areaVisibility: user.areaVisibility as "exact" | "zone" | "hidden",
+              }}
+            />
+          </CardContent>
+        </Card>
+      </FadeUp>
+
+      <FadeUp>
         <Card id="language">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
-              <Languages className="size-4 text-primary" aria-hidden />
+              <Languages className="text-primary size-4" aria-hidden />
               {t("language")}
             </CardTitle>
           </CardHeader>
@@ -90,13 +114,17 @@ export default async function SettingsPage() {
         <Card id="security">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
-              <ShieldCheck className="size-4 text-primary" aria-hidden />
+              <ShieldCheck className="text-primary size-4" aria-hidden />
               {ts("title")}
             </CardTitle>
-            <p className="text-xs text-muted-foreground">{ts("subtitle")}</p>
+            <p className="text-muted-foreground text-xs">{ts("subtitle")}</p>
           </CardHeader>
           <CardContent>
-            <SecurityCard hasPassword={hasPassword} username={user.displayUsername ?? user.username} email={user.email} />
+            <SecurityCard
+              hasPassword={hasPassword}
+              username={user.displayUsername ?? user.username}
+              email={user.email}
+            />
           </CardContent>
         </Card>
       </FadeUp>
@@ -105,7 +133,7 @@ export default async function SettingsPage() {
         <Card id="notifications">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
-              <Bell className="size-4 text-primary" aria-hidden />
+              <Bell className="text-primary size-4" aria-hidden />
               {t("notifications")}
             </CardTitle>
           </CardHeader>
@@ -130,7 +158,11 @@ export default async function SettingsPage() {
           </CardHeader>
           <CardContent>
             <BlockedList
-              users={blocked.map((b) => ({ id: b.id, name: b.name, avatarUrl: b.avatarUrl }))}
+              users={blocked.map((b) => ({
+                id: b.id,
+                name: b.name,
+                avatarUrl: b.avatarUrl,
+              }))}
             />
           </CardContent>
         </Card>
@@ -139,13 +171,13 @@ export default async function SettingsPage() {
       <FadeUp>
         <Card id="danger" className="border-destructive/30">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base text-destructive">
+            <CardTitle className="text-destructive flex items-center gap-2 text-base">
               <TriangleAlert className="size-4" aria-hidden />
               {t("deleteTitle")}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <p className="text-sm text-muted-foreground">{t("deleteText")}</p>
+            <p className="text-muted-foreground text-sm">{t("deleteText")}</p>
             <DeleteAccountDialog />
           </CardContent>
         </Card>

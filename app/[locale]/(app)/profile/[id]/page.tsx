@@ -18,23 +18,46 @@ import { formatFullDate } from "@/lib/dates";
  * Public profile. Only the area *name* is ever shown — never a phone number,
  * email or exact address.
  */
-export default async function ProfilePage({ params }: { params: Promise<{ id: string }> }) {
+export default async function ProfilePage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
   const viewer = await requireOnboarded();
   const { id } = await params;
 
-  const [t, profile] = await Promise.all([getTranslations("profile"), getPublicProfile(id, viewer.id)]);
+  const [t, profile] = await Promise.all([
+    getTranslations("profile"),
+    getPublicProfile(id, viewer.id),
+  ]);
 
   if (!profile) {
     return (
       <div className="mx-auto max-w-2xl">
-        <EmptyState title={t("notFound")} actionLabel={t("publicTitle")} actionHref="/home" />
+        <EmptyState
+          title={t("notFound")}
+          actionLabel={t("publicTitle")}
+          actionHref="/home"
+        />
       </div>
     );
   }
 
   const isOwner = profile.id === viewer.id;
   const age = profile.birthYear ? new Date().getFullYear() - profile.birthYear : null;
-  const areaName = profile.area ? profile.area.nameEn : null;
+  const areaName = profile.area
+    ? viewer.locale === "bn"
+      ? profile.area.nameBn
+      : profile.area.nameEn
+    : null;
+  const genderLabel =
+    profile.gender === "male"
+      ? t("genderMale")
+      : profile.gender === "female"
+        ? t("genderFemale")
+        : profile.gender === "other"
+          ? t("genderOther")
+          : null;
 
   return (
     <div className="mx-auto max-w-3xl space-y-5">
@@ -53,14 +76,15 @@ export default async function ProfilePage({ params }: { params: Promise<{ id: st
             {isOwner ? <Badge variant="outline">{t("owner")}</Badge> : null}
           </div>
 
-          <p className="mt-1.5 flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
+          <p className="text-muted-foreground mt-1.5 flex flex-wrap items-center gap-4 text-sm">
             {areaName ? (
               <span className="flex items-center gap-1.5">
                 <MapPin className="size-4" aria-hidden />
                 {areaName}
               </span>
             ) : null}
-            {age ? <span>{t("meta", { gender: profile.gender ?? "—", age, area: areaName ?? "—" })}</span> : null}
+            {genderLabel ? <span>{genderLabel}</span> : null}
+            {age ? <span>{t("age", { age })}</span> : null}
             <span className="flex items-center gap-1.5">
               <CalendarDays className="size-4" aria-hidden />
               {t("joined", { date: formatFullDate(profile.createdAt, viewer.locale) })}
@@ -77,7 +101,11 @@ export default async function ProfilePage({ params }: { params: Promise<{ id: st
               </Button>
             ) : (
               <>
-                <BlockButton userId={profile.id} name={profile.name} isBlocked={profile.isBlocked} />
+                <BlockButton
+                  userId={profile.id}
+                  name={profile.name}
+                  isBlocked={profile.isBlocked}
+                />
                 <ReportButton targetType="user" targetId={profile.id} variant="outline" />
               </>
             )}
@@ -85,33 +113,45 @@ export default async function ProfilePage({ params }: { params: Promise<{ id: st
         </div>
       </FadeUp>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">{t("about")}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">
-            {profile.bio || t("noBio")}
-          </p>
-        </CardContent>
-      </Card>
+      {profile.restricted ? (
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-muted-foreground text-sm leading-relaxed">
+              {t("restricted")}
+            </p>
+          </CardContent>
+        </Card>
+      ) : (
+        <>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">{t("about")}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-muted-foreground text-sm leading-relaxed whitespace-pre-wrap">
+                {profile.bio || t("noBio")}
+              </p>
+            </CardContent>
+          </Card>
 
-      <section className="space-y-3">
-        <h2 className="text-base font-semibold">{t("interests")}</h2>
-        {profile.interests.length ? (
-          <Stagger className="flex flex-wrap gap-2">
-            {profile.interests.map((interest) => (
-              <StaggerItem key={interest.id}>
-                <Badge variant="outline" className="px-3 py-1.5 text-sm">
-                  {viewer.locale === "bn" ? interest.nameBn : interest.nameEn}
-                </Badge>
-              </StaggerItem>
-            ))}
-          </Stagger>
-        ) : (
-          <p className="text-sm text-muted-foreground">{t("noBio")}</p>
-        )}
-      </section>
+          <section className="space-y-3">
+            <h2 className="text-base font-semibold">{t("interests")}</h2>
+            {profile.interests.length ? (
+              <Stagger className="flex flex-wrap gap-2">
+                {profile.interests.map((interest) => (
+                  <StaggerItem key={interest.id}>
+                    <Badge variant="outline" className="px-3 py-1.5 text-sm">
+                      {viewer.locale === "bn" ? interest.nameBn : interest.nameEn}
+                    </Badge>
+                  </StaggerItem>
+                ))}
+              </Stagger>
+            ) : (
+              <p className="text-muted-foreground text-sm">{t("noBio")}</p>
+            )}
+          </section>
+        </>
+      )}
     </div>
   );
 }

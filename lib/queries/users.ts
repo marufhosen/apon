@@ -1,8 +1,14 @@
 import "server-only";
 
-import { and, desc, eq, isNotNull, or, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, isNull, or, sql } from "drizzle-orm";
 
 import { db } from "@/lib/db";
+import {
+  canViewFullProfile,
+  pickVisibleArea,
+  type AreaVisibility,
+  type ProfileVisibility,
+} from "@/lib/privacy";
 import {
   accounts,
   areas,
@@ -24,8 +30,25 @@ export type PublicProfile = NonNullable<Awaited<ReturnType<typeof getPublicProfi
  * the only location data that leaves the server is the area name.
  */
 export async function getPublicProfile(profileId: string, viewerId?: string) {
+  // Select only profile columns: contact details must never reach this query.
   const rows = await db
-    .select()
+    .select({
+      id: users.id,
+      name: users.name,
+      avatarUrl: users.avatarUrl,
+      bio: users.bio,
+      gender: users.gender,
+      birthYear: users.birthYear,
+      role: users.role,
+      createdAt: users.createdAt,
+      status: users.status,
+      deletedAt: users.deletedAt,
+      areaId: users.areaId,
+      profileVisibility: users.profileVisibility,
+      showGender: users.showGender,
+      showAge: users.showAge,
+      areaVisibility: users.areaVisibility,
+    })
     .from(users)
     .where(eq(users.id, profileId))
     .limit(1);
@@ -33,9 +56,20 @@ export async function getPublicProfile(profileId: string, viewerId?: string) {
   const user = rows[0];
   if (!user || user.deletedAt || user.status === "suspended") return null;
 
-  const [areaRows, interestRows, blockRows] = await Promise.all([
+  const isOwner = Boolean(viewerId && viewerId === profileId);
+
+  const [areaRows, interestRows, blockRows, sharedCircleRows] = await Promise.all([
     user.areaId
-      ? db.select().from(areas).where(eq(areas.id, user.areaId)).limit(1)
+      ? db
+          .select({
+            nameEn: areas.nameEn,
+            nameBn: areas.nameBn,
+            zoneLabelEn: areas.zoneLabelEn,
+            zoneLabelBn: areas.zoneLabelBn,
+          })
+          .from(areas)
+          .where(eq(areas.id, user.areaId))
+          .limit(1)
       : Promise.resolve([]),
     db
       .select({ interest: interests })
@@ -44,36 +78,70 @@ export async function getPublicProfile(profileId: string, viewerId?: string) {
       .where(eq(userInterests.userId, profileId)),
     viewerId
       ? db
-          .select()
+          .select({ id: blocks.id })
           .from(blocks)
           .where(
-            and(
-              or(eq(blocks.blockerId, viewerId), eq(blocks.blockerId, profileId)),
-              or(eq(blocks.blockedId, viewerId), eq(blocks.blockedId, profileId)),
+            or(
+              and(eq(blocks.blockerId, viewerId), eq(blocks.blockedId, profileId)),
+              and(eq(blocks.blockerId, profileId), eq(blocks.blockedId, viewerId)),
             ),
           )
           .limit(1)
       : Promise.resolve([]),
+    viewerId && viewerId !== profileId && user.profileVisibility === "circles"
+      ? db
+          .select({ id: circleMembers.id })
+          .from(circleMembers)
+          .innerJoin(circles, eq(circleMembers.circleId, circles.id))
+          .where(
+            and(
+              eq(circleMembers.userId, viewerId),
+              inArray(circleMembers.status, ["invited", "active"]),
+              inArray(circles.status, ["forming", "active"]),
+              isNull(circles.deletedAt),
+              // The peer must still be a current member of the same circle.
+              sql`exists (select 1 from circle_members peer where peer.circle_id = ${circleMembers.circleId} and peer.user_id = ${profileId} and peer.status in ('invited', 'active'))`,
+            ),
+          )
+          .limit(1)
+      : Promise.resolve([] as { id: number }[]),
   ]);
+
+  // A block is mutual invisibility, not a profile with a banner.
+  if (blockRows.length > 0) return null;
+
+  const canViewFull = canViewFullProfile({
+    profileVisibility: user.profileVisibility as ProfileVisibility,
+    isOwner,
+    isSignedIn: Boolean(viewerId),
+    sharesCircle: sharedCircleRows.length > 0,
+  });
+
+  const visibleArea = pickVisibleArea(
+    areaRows[0] ?? null,
+    user.areaVisibility as AreaVisibility,
+    isOwner,
+  );
 
   return {
     id: user.id,
     name: user.name,
     avatarUrl: user.avatarUrl,
-    bio: user.bio,
-    gender: user.gender,
-    birthYear: user.birthYear,
     role: user.role,
     createdAt: user.createdAt,
-    area: areaRows[0] ?? null,
-    interests: interestRows.map((r) => r.interest),
-    isBlocked: blockRows.length > 0,
+    restricted: !canViewFull,
+    bio: canViewFull ? user.bio : null,
+    gender: canViewFull && (isOwner || user.showGender) ? user.gender : null,
+    birthYear: canViewFull && (isOwner || user.showAge) ? user.birthYear : null,
+    area: canViewFull ? visibleArea : null,
+    interests: canViewFull ? interestRows.map((r) => r.interest) : [],
+    isBlocked: false,
   };
 }
 
 export interface UserSetup {
-  preferences: (typeof preferences.$inferSelect) | null;
-  settings: (typeof userSettings.$inferSelect) | null;
+  preferences: typeof preferences.$inferSelect | null;
+  settings: typeof userSettings.$inferSelect | null;
   interests: (typeof interests.$inferSelect)[];
   availability: (typeof availability.$inferSelect)[];
 }
@@ -134,9 +202,7 @@ export async function getUserActiveCircleCount(userId: string) {
     .select({ id: circleMembers.id })
     .from(circleMembers)
     .innerJoin(circles, eq(circleMembers.circleId, circles.id))
-    .where(
-      and(eq(circleMembers.userId, userId), eq(circles.status, "active")),
-    );
+    .where(and(eq(circleMembers.userId, userId), eq(circles.status, "active")));
   return rows.length;
 }
 
@@ -167,7 +233,10 @@ export type EmailPreference =
   | "emailGeneral";
 
 /** Whether a transactional email of this kind is enabled for the member. */
-export async function emailAllowed(userId: string, key: EmailPreference): Promise<boolean> {
+export async function emailAllowed(
+  userId: string,
+  key: EmailPreference,
+): Promise<boolean> {
   const prefs = await getNotificationPrefs(userId);
   return prefs[key];
 }
@@ -179,7 +248,13 @@ export async function hasCredentialPassword(userId: string): Promise<boolean> {
   const rows = await db
     .select({ id: accounts.id })
     .from(accounts)
-    .where(and(eq(accounts.userId, userId), eq(accounts.providerId, "credential"), isNotNull(accounts.password)))
+    .where(
+      and(
+        eq(accounts.userId, userId),
+        eq(accounts.providerId, "credential"),
+        isNotNull(accounts.password),
+      ),
+    )
     .limit(1);
   return rows.length > 0;
 }

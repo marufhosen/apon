@@ -61,6 +61,14 @@ export const users = pgTable(
     bio: text("bio"),
     avatarUrl: text("avatar_url"),
 
+    // Privacy: who may see the full profile, and whether sensitive fields are
+    // shown at all. Defaults are deliberately conservative but keep profile
+    // links from activities and circles usable for signed-in members.
+    profileVisibility: text("profile_visibility").notNull().default("members"), // members | circles | hidden
+    showGender: boolean("show_gender").notNull().default(true),
+    showAge: boolean("show_age").notNull().default(true),
+    areaVisibility: text("area_visibility").notNull().default("zone"), // exact | zone | hidden
+
     // App-level columns
     role: text("role").notNull().default("member"), // member | host | admin
     locale: text("locale").notNull().default("en"), // en | bn
@@ -161,9 +169,14 @@ export const areas = pgTable(
     nameBn: text("name_bn").notNull(),
     /** division | district | city_corporation | upazila | thana | ward | union | area | village */
     level: text("level").notNull().default("area"),
-    parentId: integer("parent_id").references((): AnyPgColumn => areas.id, { onDelete: "restrict" }),
+    parentId: integer("parent_id").references((): AnyPgColumn => areas.id, {
+      onDelete: "restrict",
+    }),
     /** Ids of every ancestor, root (division) first. Excludes the node itself. */
-    ancestorIds: integer("ancestor_ids").array().notNull().default(sql`'{}'::integer[]`),
+    ancestorIds: integer("ancestor_ids")
+      .array()
+      .notNull()
+      .default(sql`'{}'::integer[]`),
     /** Source reference, e.g. `upazila:123` from the BBS-derived dataset. */
     code: text("code"),
     lat: doublePrecision("lat"),
@@ -437,7 +450,10 @@ export const venues = pgTable(
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
-  (t) => [index("venues_area_idx").on(t.areaId), index("venues_approved_idx").on(t.approved)],
+  (t) => [
+    index("venues_area_idx").on(t.areaId),
+    index("venues_approved_idx").on(t.approved),
+  ],
 );
 
 export const activities = pgTable(
@@ -508,7 +524,9 @@ export const hostApplications = pgTable(
     motivation: text("motivation").notNull(),
     experience: text("experience"),
     /** Optional supporting document (private Cloudinary asset). */
-    attachmentUploadId: integer("attachment_upload_id").references(() => uploads.id, { onDelete: "set null" }),
+    attachmentUploadId: integer("attachment_upload_id").references(() => uploads.id, {
+      onDelete: "set null",
+    }),
     status: text("status").notNull().default("pending"), // pending | approved | rejected
     reviewedBy: text("reviewed_by").references(() => users.id, { onDelete: "set null" }),
     reviewedAt: timestamp("reviewed_at", tz),
@@ -536,7 +554,9 @@ export const reports = pgTable(
     reason: text("reason").notNull(),
     details: text("details"),
     /** Optional evidence screenshot/PDF (private Cloudinary asset). */
-    attachmentUploadId: integer("attachment_upload_id").references(() => uploads.id, { onDelete: "set null" }),
+    attachmentUploadId: integer("attachment_upload_id").references(() => uploads.id, {
+      onDelete: "set null",
+    }),
     status: text("status").notNull().default("open"), // open | actioned | dismissed
     resolutionNote: text("resolution_note"),
     resolvedBy: text("resolved_by").references(() => users.id, { onDelete: "set null" }),
@@ -574,7 +594,9 @@ export const feedback = pgTable(
     userId: text("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
-    activityId: integer("activity_id").references(() => activities.id, { onDelete: "cascade" }),
+    activityId: integer("activity_id").references(() => activities.id, {
+      onDelete: "cascade",
+    }),
     circleId: integer("circle_id").references(() => circles.id, { onDelete: "set null" }),
     comfortable: integer("comfortable").notNull(),
     wantToMeetAgain: boolean("want_to_meet_again").notNull(),
@@ -599,7 +621,9 @@ export const notifications = pgTable(
     title: text("title").notNull(),
     body: text("body"),
     href: text("href"),
-    payload: jsonb("payload").notNull().default(sql`'{}'::jsonb`),
+    payload: jsonb("payload")
+      .notNull()
+      .default(sql`'{}'::jsonb`),
     readAt: timestamp("read_at", tz),
     createdAt: createdAt(),
   },
@@ -681,7 +705,10 @@ export const pollOptionsRelations = relations(pollOptions, ({ one, many }) => ({
 
 export const pollVotesRelations = relations(pollVotes, ({ one }) => ({
   poll: one(polls, { fields: [pollVotes.pollId], references: [polls.id] }),
-  option: one(pollOptions, { fields: [pollVotes.optionId], references: [pollOptions.id] }),
+  option: one(pollOptions, {
+    fields: [pollVotes.optionId],
+    references: [pollOptions.id],
+  }),
   user: one(users, { fields: [pollVotes.userId], references: [users.id] }),
 }));
 
@@ -719,7 +746,10 @@ export const blocksRelations = relations(blocks, ({ one }) => ({
 
 export const feedbackRelations = relations(feedback, ({ one }) => ({
   user: one(users, { fields: [feedback.userId], references: [users.id] }),
-  activity: one(activities, { fields: [feedback.activityId], references: [activities.id] }),
+  activity: one(activities, {
+    fields: [feedback.activityId],
+    references: [activities.id],
+  }),
   circle: one(circles, { fields: [feedback.circleId], references: [circles.id] }),
 }));
 

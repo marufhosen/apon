@@ -3,8 +3,10 @@
 **Audit date:** 9 November 2026  
 **Repository:** `bondhu-circle` (product name: APON)  
 **Stack reviewed:** Next.js 16.4.1 (App Router, `proxy.ts`), React 19, PostgreSQL + Drizzle ORM, Better Auth, next-intl (English / বাংলা), Tailwind CSS v4, Cloudinary, Resend, Twilio-compatible SMS  
-**Audit type:** Read-only static audit, schema review, route trace, build verification, and automated checks  
-**Deliverable:** this report only. No application source file, schema, migration, or configuration was changed.
+**Audit type:** Static audit, schema review, route trace, build verification, and automated checks
+
+**Remediation status:** Updated after the first remediation pass. Resolved issue cards were removed; remaining issues and the action plan reflect the current code.
+**Deliverable:** a living remaining-issues report, not a snapshot of the original codebase.
 
 > **Basis labels used throughout**
 >
@@ -21,67 +23,60 @@
 
 ### A.1 Overall project health
 
-APON is **well above the average early-stage codebase in structure and discipline**. The layering is clear (Server Actions → `createAction` → Drizzle queries), authorization is deliberately multi-layered (`proxy.ts` → route-group guards → action `authorize`), uploads have a real policy and ownership model, private venue addresses are withheld until an RSVP is confirmed, and the bilingual catalogs are complete and genuinely translated. TypeScript, ESLint, the production build, and all 83 unit tests pass.
+APON has changed materially since the original audit. The core circle journey now works end to end: matching creates `forming` circles, invitees can accept or decline, a circle activates once three members accept, and members can chat, vote and leave. Poll voting is scoped per member, the notification centre exists, notification preferences suppress both channels, attendee identities are scoped, profile privacy controls are enforced, report moderation can preview and hide a message, rematch requests can be resolved, activity capacity/cancel/check-in guards exist, account deletion removes identity and private uploads and notifies attendees, email/phone uniqueness is database-enforced, SMS no longer logs codes and propagates delivery failures, and security headers are live.
 
-It is also **not close to production-ready as a social product**. The core promise — matching people into a circle they can actually join and use — is broken at the lifecycle level. Two defects alone would make a launch fail:
-
-1. Matching creates circles in `forming` status with members in `invited` status, and **no code path anywhere activates the circle or accepts an invitation**. The member circle list only returns `active` circles, and every circle action requires `active`. Matched users therefore receive an invitation email/notification that leads to an empty page and cannot enter the circle at all.
-2. `votePoll` deletes **every vote in the poll**, not just the caller's, so each new vote silently wipes other members' choices.
-
-Beyond those, the notification centre route does not exist (the bell in the header links to a 404), notification preferences are stored but never enforced by any sender, the attendee list on an activity is visible to every onboarded member (including people who are only waitlisted or cancelled), and there is no moderation action to hide or remove a reported circle message. Legal pages, monitoring, CI, committed migrations, security headers, sitemap/robots, and a deploy configuration are all absent.
+The remaining launch blockers are mostly operational, legal and product-scope rather than core data loss: there is no privacy policy, terms page or sign-up consent; no monitoring, CI or committed migrations; and the advertised social graph (discovery, connections, DMs, communities, posts) does not exist. A smaller set of High issues remains: activity lifecycle e-mails still link to the activity board, production only warns when SMS is unconfigured, account deletion does not recompute affected circles, and editing an activity does not notify attendees.
 
 ### A.2 Scorecard
 
 | Area | Rating | Summary |
 | --- | --- | --- |
 | Architecture & layering | ★★★★☆ | Clear route groups, action wrapper, query layer, pure domain logic. A few boundary leaks and dead exports. |
-| Authentication | ★★★☆☆ | Password + email OTP + phone OTP + reset + session revocation are implemented. Missing email uniqueness at the DB, email change, 2FA, and reliable production SMS delivery. |
-| Authorization / RBAC | ★★★★☆ | Layered and mostly consistent; real 403s; ownership checks on uploads and hosted activities. Default-public route policy and a few ungated read queries are the gaps. |
-| Database & integrity | ★★★☆☆ | Broad, sensible schema with soft deletes and useful indexes. Missing unique email, poll vote data loss, waitlist race, no committed migrations. |
-| Core circle journey | ★☆☆☆☆ | Matching output cannot be activated or accepted; remaining members can lose a circle after a leave. |
-| Activities & RSVP | ★★★★☆ | Strong: capacity transaction, waitlist, address gating, host tools. Edit/cancel state and attendee privacy need work. |
+| Authentication | ★★★★☆ | Password + email OTP + phone OTP + reset + session revocation; unique email/phone indexes. Missing 2FA, email change, and fail-fast boot without SMS. |
+| Authorization / RBAC | ★★★★☆ | Layered and mostly consistent; real 403s; ownership checks on uploads and hosted activities. A few ungated reads remain. |
+| Database & integrity | ★★★★☆ | Broad, sensible schema with soft deletes and useful indexes. Poll vote loss and duplicate email are fixed; waitlist races, list bounds and uncommitted migrations remain. |
+| Core circle journey | ★★★★☆ | Match → accept/decline → activation → chat/vote works. Poll closing, leave consistency and chat pagination are still missing. |
+| Activities & RSVP | ★★★★☆ | Strong capacity transaction, waitlist, address gating, cancel/check-in guards. Edit notifications, feedback completion and past re-approval need work. |
 | Social features (connections, DMs, communities, posts) | ★☆☆☆☆ | Not implemented. The product currently offers automatic circles + circle chat, not a general social network. |
-| Notifications | ★★☆☆☆ | Notifications are written, but there is no centre page, no read UI, no preference enforcement, and email links are locale-less. |
-| Safety & moderation | ★★☆☆☆ | Reporting, evidence uploads, blocking, suspension exist. No message hide/remove, no target context for admins, no audit log, no content screening. |
-| Privacy | ★★☆☆☆ | Contact details are protected and addresses gated, but attendee identities, gender, age and exact area are exposed with no user controls. |
-| UI / UX | ★★★★☆ | Consistent design system, mobile bottom nav, empty states, motion with reduced-motion support, good form primitives. Some broken journeys and untranslated data labels. |
-| Internationalization | ★★★☆☆ | 938 keys in both catalogs, zero missing keys, bn copy is genuinely Bangla. Data names, validation messages, admin labels and server-generated notifications leak English. |
+| Notifications | ★★★★☆ | Notification centre, read actions, in-app/email preference enforcement and invite deep links exist. Activity e-mails still link to the board; one-click unsubscribe is missing. |
+| Safety & moderation | ★★★☆☆ | Reporting with target preview, message hiding, blocking and suspension exist. No admin audit log, appeal path or content screening. |
+| Privacy | ★★★★☆ | Profile visibility, gender/age/area controls, blocked-profile hiding and scoped attendee lists are implemented. Data export is still missing. |
+| UI / UX | ★★★★☆ | Consistent design system, mobile bottom nav, empty states, motion with reduced-motion support, good form primitives. Some broken edge journeys and untranslated data labels. |
+| Internationalization | ★★★☆☆ | 975 keys in both catalogs, zero missing keys, bn copy is genuinely Bangla. Data names, validation messages, admin labels and server notifications still leak English. |
 | Performance | ★★★☆☆ | No measurements. Proxy does a session + DB lookup per protected request; jobs are N+1; several lists are unbounded. |
-| Security | ★★★☆☆ | Good fundamentals (parameterized SQL, Zod, signed private uploads, cookie flags, rate limits). Missing headers/CSP, hardcoded local credential, OTP logging path, weak secret minimum. |
+| Security | ★★★★☆ | CSP/headers/HSTS, parameterized SQL, Zod, signed private uploads, cookie flags, rate limits. Dependency advisories and weak secret minimum remain. |
 | SEO | ★★☆☆☆ | Landing page has title/description/hreflang/OG. No sitemap, robots.txt, canonical policy, per-page OG, JSON-LD, or noindex on private routes. |
-| Testing | ★★★☆☆ | 83 unit tests across the pure domains; 21 Playwright cases exist. No tests for the broken circle lifecycle, polls, notifications, blocking, jobs or admin queues; E2E not executed in this audit. |
+| Testing | ★★★☆☆ | 93 unit tests across the pure domains; 21 Playwright cases exist. No automated coverage for the new circle lifecycle, polls, notifications, privacy or moderation; E2E not executed in this audit. |
 | Operations | ★☆☆☆☆ | No monitoring, alerting, health check, CI, committed migrations/lockfile, backup/retention documentation, or concrete deploy configuration. |
-| **Overall** | **★★☆☆☆** | **A promising, well-built foundation with a non-functional core journey and launch-critical safety/ops gaps. Production readiness: NO-GO.** |
+| **Overall** | **★★★☆☆** | **Core journey and major safety gaps are fixed. Remaining blockers are legal, observability, release engineering and product scope. Production readiness: NO-GO.** |
 
 ### A.3 Top launch blockers
 
-1. **Circle lifecycle is dead** (`CIRC-01`): `forming` circles are never activated; `invited` members are never accepted; `/circles` hides the circle; actions reject it. Every matched user is stranded.
-2. **Poll voting destroys other members' votes** (`CIRC-02`): `delete(pollVotes).where(pollId)` instead of `(pollId, userId)`.
-3. **No invitation consent flow** (`CIRC-03`): no accept/decline action, so `invited` is a permanent state.
-4. **Notification centre is a 404** (`CIRC-04`): the header bell links to `/notifications`, which is not in the route table; mark-read actions are unused.
-5. **Notification preferences are ignored** (`CIRC-05`): settings are stored, but `notify()` and every email sender ignore them.
-6. **Attendee identities are exposed** (`CIRC-06`): any onboarded member can see the names and avatars of everyone who RSVP'd, waitlisted, or cancelled.
-7. **Rematch queue cannot be worked** (`ADMIN-01`): requests are listed but no action marks them handled, so the dashboard count never falls.
-8. **Reported messages cannot be moderated** (`ADMIN-02`): admins get a target ID and raw enum, no message content, and there is no hide/remove action.
-9. **Email is not unique in the database** (`AUTH-01`): concurrent sign-ups can create duplicate accounts, and email lookup has no index.
-10. **Phone OTP delivery can fail silently** (`AUTH-02`): `SMS_PROVIDER` defaults to `console`, the console provider logs the OTP in any environment, and `sendOTP` swallows delivery errors.
-11. **No privacy policy, terms of service, or sign-up consent** (`LEGAL-01`) — a launch blocker for a platform handling gender, age and location data.
-12. **No monitoring, CI, or committed migrations** (`OPS-01`, `OPS-02`) — failures would be invisible and deployments not reproducible.
+1. **No privacy policy, terms of service, or sign-up consent** (`LEGAL-01`) — a launch blocker for a platform handling gender, age and location data.
+2. **No monitoring, alerting or health check** (`OPS-01`) — failures in matching, reminders, SMS or uploads would be invisible.
+3. **No CI, deploy configuration, or committed migrations/lockfile** (`OPS-02`, `DATA-08`) — deployments are not reproducible.
+4. **The advertised social graph is absent** (`DISC-01`) — discovery, connections, DMs, communities and posts do not exist.
+5. **Activity lifecycle e-mails link to the board** (`CIRC-07`) — reminders, waitlist promotions and feedback e-mails do not deep-link to the activity.
+6. **Production only warns when SMS is unconfigured** (`AUTH-02`) — phone OTP remains unusable without Twilio, though delivery now fails visibly and codes are not logged.
+7. **Account deletion leaves circle state inconsistent** (`SAFE-03`) — memberships are removed without recomputing or notifying the remaining circle.
+8. **Editing an activity does not notify attendees** (`DATA-01`) — time/venue/capacity changes are silent, and past activities can still be re-approved.
 
 ### A.4 What is genuinely strong
 
-- **Layered authorization**: `proxy.ts` performs the cheap check, route-group layouts call `requireRole` / `requireAdmin` / `requireHost`, and every mutation uses `createAction` with an `authorize` policy. A direct URL to `/en/admin/...` returns a real 403, not a silent redirect (verified by the existing E2E spec).
-- **Upload security**: magic-byte typing, purpose-specific size/type policy, ownership resolution (`resolveOwnedImage` / `resolveOwnedAttachment`), private Cloudinary assets, and short-lived signed download links. This is better than most MVPs.
-- **Location system**: a 5,924-node Bangladesh tree (division → district → upazila/thana → union/ward → area/village) with ancestor arrays, a GIN index, cascading pickers, search, and zone mapping for matching. The structure is sound; seed coverage is the main gap.
-- **RSVP correctness**: the join/cancel path locks the activity row, computes capacity inside the transaction, promotes the oldest waitlisted member, and never exposes the exact address before `going`. This is a strong design.
-- **Bilingual catalogs**: 938 keys in `en.json` and `bn.json`, full parity, and the Bangla values are translated (only a placeholder email address remains Latin).
+- **Circle lifecycle**: invite accept/decline, three-accept activation, `forming` visibility, member counts and deep links are implemented; poll votes are scoped per member.
+- **Layered authorization**: `proxy.ts` performs the cheap check, route-group layouts call `requireRole` / `requireAdmin` / `requireHost`, and every mutation uses `createAction` with an `authorize` policy. A direct URL to `/en/admin/...` returns a real 403, not a silent redirect.
+- **Upload security**: magic-byte typing, purpose-specific size/type policy, ownership resolution (`resolveOwnedImage` / `resolveOwnedAttachment`), private Cloudinary assets, and short-lived signed download links.
+- **Privacy controls**: profile visibility, gender/age toggles, exact/zone/hidden area, blocked-profile hiding and scoped attendee identities are enforced at query time.
+- **Location system**: a 5,924-node Bangladesh tree (division → district → upazila/thana → union/ward → area/village) with ancestor arrays, a GIN index, cascading pickers, search, and zone mapping for matching.
+- **RSVP correctness**: the join/cancel path locks the activity row, computes capacity inside the transaction, promotes the oldest waitlisted member, and never exposes the exact address before `going`.
+- **Bilingual catalogs**: 975 keys in `en.json` and `bn.json`, full parity, and the Bangla values are translated.
 - **Server Actions discipline**: no ad-hoc app API routes; `/api/auth/*` is the only API surface; errors are translation keys, not raw exceptions.
 - **UI system**: consistent Radix/CVA primitives, teal/amber palette, responsive grids, mobile bottom navigation with safe-area padding, empty states, and motion primitives that honour `prefers-reduced-motion`.
-- **Code health**: `tsc --noEmit`, ESLint, the production build and the unit suite all pass; the pure domains (`matching/core`, `rsvp/waitlist`, `rbac`, `geo`, uploads) are isolated and tested.
+- **Code health**: `tsc --noEmit`, ESLint, the production build and the unit suite all pass; the pure domains (`matching/core`, `rsvp/waitlist`, `rbac`, `geo`, uploads, privacy) are isolated and tested.
 
 ### A.5 Production readiness decision
 
-**NO-GO.** The application should not be opened to public users until at least Phase 1 and Phase 2 of Section E are complete. A closed beta is possible only after the circle lifecycle, poll voting, notification centre, preference enforcement and attendee-privacy fixes are deployed, with monitoring and a rollback plan.
+**NO-GO for public launch.** There are no open Critical issues, and a closed beta is now plausible after the pending migrations are applied and the core journeys are smoke-tested. Public launch still requires at least `LEGAL-01`, `OPS-01`, `OPS-02` and a reproducible release process. `DISC-01` is a product-scope decision: either build the advertised social graph or align the marketing and README with the circles-first product.
 
 ---
 
@@ -91,21 +86,25 @@ Beyond those, the notification centre route does not exist (the bell in the head
 
 | Feature | Evidence / notes |
 | --- | --- |
-| Email + username/password sign-up and sign-in | Better Auth `emailAndPassword` + `username` plugin; strong password and username schemas; rate limits. |
+| Email + username/password sign-up and sign-in | Better Auth `emailAndPassword` + `username` plugin; strong password and username schemas; rate limits; unique lower(email) and phone indexes. |
 | Email OTP verification | 6 digits, 10-minute expiry, 5 attempts, hashed in production / plain in dev-test for E2E; resend through the same flow. |
 | Password reset | OTP by email, session revocation, password update; E2E spec exists. |
-| Phone OTP verification | BD-only validator, 6 digits, 5-minute expiry, 3 attempts; used as the RSVP gate. Delivery reliability is a gap (`AUTH-02`). |
+| Phone OTP verification | BD-only validator, 6 digits, 5-minute expiry, 3 attempts; console provider refuses production and delivery errors propagate. Boot-time fail-fast is still missing (`AUTH-02`). |
 | Session management | DB sessions, 30-day expiry, daily refresh, 1-day fresh age, httpOnly/SameSite/Secure cookies in production; suspension deletes sessions. |
 | Onboarding | Interests (3–8), availability, group-size/women-only/language preferences, cascading area picker, guidelines acceptance, optional phone verification. |
-| Profile view/edit | Name, gender, birth year, bio, area, avatar; public profile excludes email and phone; avatar ownership resolution and old-asset cleanup. |
+| Profile view/edit and privacy | Name, gender, birth year, bio, area, avatar; profile visibility, gender/age toggles, exact/zone/hidden area; public profile excludes email and phone. |
+| Circle lifecycle | Matching creates `forming` circles with invited members; accept/decline actions, three-accept activation, invitation notifications and member counts. Admin circle controls remain read-only (`ADMIN-03`). |
+| Circle chat & time poll | Membership-gated message thread, reporting, blocked-message filtering, poll creation and per-member multi-select votes. Poll closing is still missing (`CIRC-09`). |
 | Bangladesh location tree | 5,924 nodes, 8 levels, ancestor arrays, search, dependent selects, admin browsing, zone mapping used by matching. |
 | Activity board | Filters (category, area at any level, date, price, women-only), URL state via nuqs, pagination, cards. |
-| Activity detail & RSVP | Capacity transaction, waitlist, promotion, cancel, address/map gated to `going`, host card, reporting entry points. |
-| Host application & activity management | Apply, admin review, create/edit/cancel, cover upload, venue selection, attendee list, check-in. |
-| Circle chat & time poll | Membership-gated message thread, reporting, blocked-message filtering, poll creation/voting (voting is broken — `CIRC-02`). |
-| Safety basics | Report user/activity/message with private evidence, block/unblock, admin resolution, suspension/restore, 403 pages. |
-| Admin panel | Overview KPIs, users, reports, host applications, activities, venues, locations, circles, metrics; role-aware navigation. |
-| Bilingual product | 938 keys per locale, locale-prefixed URLs, localized email copy, Dhaka time zone in the client provider. |
+| Activity detail & RSVP | Capacity transaction, waitlist, promotion, cancel, address/map gated to `going`, host card, reporting entry points, scoped attendee identities. |
+| Host application & activity management | Apply, admin review, create/edit/cancel, capacity floor, cancel releases RSVPs, check-in only for `going`, cover upload, venue selection. |
+| Notification centre | `/notifications` page, unread badge, per-item and mark-all read actions, empty state, RBAC route policy. |
+| Notification preferences | In-app and email preferences are enforced by `notify()`, matching, reminders, feedback and waitlist promotion. |
+| Moderation basics | Report user/activity/message with private evidence, admin target preview, message hide/restore, report resolution, block/unblock, suspension/restore, 403 pages. |
+| Admin queues | Users, reports, host applications, activities, venues, locations, circles, metrics, rematch resolution. |
+| Security baseline | CSP, HSTS, frame/nosniff/referrer/permissions headers, `poweredByHeader: false`, no hardcoded credentials, private upload links. |
+| Bilingual product | 975 keys per locale, locale-prefixed URLs, localized email copy, Dhaka time zone in the client provider. |
 | Uploads | Avatars, activity covers, venue photos, report evidence, host documents; signed Cloudinary flow; policy enforced twice. |
 | Rate limiting | Postgres fixed windows: sign-in/sign-up/OTP, RSVP, message, report, feedback, host application, uploads, username availability. |
 | PWA basics | Web manifest + 192/512 icons + apple icon; theme color; no documented offline behaviour. |
@@ -115,15 +114,15 @@ Beyond those, the notification centre route does not exist (the bell in the head
 
 | Feature | What exists | What is missing / broken |
 | --- | --- | --- |
-| Circle lifecycle | Matching creates `forming` circles and `invited` members; circle page, chat and poll exist. | Activation, invite accept/decline, member counts, deep links, admin activation, state transition to `active`. |
-| Notifications | `notifications` table, `notify()`, unread count, mark-read actions, in-app/email preference columns. | `/notifications` page, mark-read UI, preference enforcement, unsubscribe, live unread count. |
-| Moderation | Report queue, resolution note, evidence links, suspension. | Hide/remove message, target content preview, audit log, appeals, category management. |
-| Feedback | Private feedback form, schema, admin aggregate metrics, feedback job. | Server-side completion check, reliable RSVP lookup, host-driven completion, reminder scheduling. |
+| Circle lifecycle | Matching, accept/decline, quorum activation, chat and voting work. | Polls never close (`CIRC-09`); leaving can hide the circle from remaining members (`CIRC-08`); member list/pagination gaps (`CIRC-10`, `CIRC-11`). |
+| Notifications | Centre, read actions, preference enforcement, invite/settings deep links. | Activity e-mails link to `/activities` rather than the activity (`CIRC-07`); no one-click unsubscribe token (`NOTIF-01`). |
+| Moderation | Report target preview, message hide, resolution note, suspension. | Admin audit log (`SAFE-07`), appeals (`SAFE-06`), automated content screening (`SAFE-05`), category management. |
+| Feedback | Private feedback form, schema, admin aggregate metrics, feedback job. | Server-side completion check and reliable RSVP lookup (`DATA-04`). |
 | Location data | Full administrative tree and urban zones. | Village-level seed coverage, city-corporation ward nuances, `users.area_id` foreign key. |
-| Email | Branded bilingual templates for auth, invite, reminder, promotion, feedback, host decision. | Locale-preserving links, unsubscribe, preference checks, deliverability setup, reliable non-auth sending. |
-| Admin queues | Counts and lists for reports, hosts, activities, circle requests. | Pagination, filters, bulk actions, resolving rematch requests, audit trail. |
+| Email | Branded bilingual templates for auth, invite, reminder, promotion, feedback, host decision; invite/settings links are locale-aware. | Activity-specific links (`CIRC-07`), one-click unsubscribe (`NOTIF-01`), deliverability setup, reliable non-auth sending. |
+| Admin queues | Counts and lists for reports, hosts, activities, circle requests; rematch resolution. | Pagination, filters, bulk actions and audit trail (`ADMIN-04`, `SAFE-07`). |
 | SEO | Landing metadata with hreflang and OG image; manifest. | Sitemap, robots, canonical, per-page OG, noindex on private routes, structured data. |
-| Testing | 83 unit tests; 21 Playwright cases. | Coverage of the broken core flows, component tests, accessibility tests, CI execution. |
+| Testing | 93 unit tests; 21 Playwright cases. | Integration coverage for circle lifecycle, polls, notifications, privacy and moderation; CI execution. |
 
 ### B.3 Missing features
 
@@ -135,8 +134,7 @@ These are absent, not merely broken. They are listed separately so they are not 
 - **Public/private communities** — circles are system-matched and private; there is no create/join/leave community flow, membership approval, or public community directory.
 - **Posts, comments, reactions** — no feed or user-generated posts outside circle chat.
 - **Community discovery / recommendations** — no interest- or location-based community suggestions.
-- **Notification centre UI** — route, list, filters, mark read/all, empty state.
-- **Privacy controls** — profile visibility, discoverability, field-level visibility, coarse location, blocking semantics.
+- **One-click e-mail unsubscribe** — preference links exist, but no signed unsubscribe token or preference-centre landing page.
 - **Admin audit log** — no record of who suspended, approved, edited or resolved what.
 - **Interest/category management** — interests are seeded; no admin CRUD.
 - **Platform configuration** — no feature flags, matching schedule, limits, or announcement management.
@@ -148,25 +146,16 @@ These are absent, not merely broken. They are listed separately so they are not 
 - **Legal pages** — no privacy policy or terms of service; guidelines and photo credits exist.
 - **Sitemap, robots.txt, canonical/hreflang policy** beyond the landing page.
 - **Monitoring, alerting, health endpoint, CI/CD, backups/retention.**
-- **Email unsubscribe / preference centre link.**
 
 ### B.4 Broken features (confirmed)
 
 | Broken behaviour | Where | See |
 | --- | --- | --- |
-| Matched users cannot enter their circle | matching → `/circles` → circle actions | `CIRC-01` |
-| One member's vote deletes everyone's votes | `lib/actions/circles.ts` | `CIRC-02` |
-| Header bell opens a 404 | `components/features/nav/notification-bell.tsx` | `CIRC-04` |
-| Notification preferences have no effect | `lib/notify.ts`, email senders | `CIRC-05` |
-| Attendee identities visible to all members | `lib/queries/activities.ts` | `CIRC-06` |
-| Invitation e-mails link to an empty circle list | `lib/email/index.tsx` | `CIRC-07` |
-| Rematch requests cannot be closed | `lib/queries/admin.ts`, admin circles page | `ADMIN-01` |
-| Reported messages cannot be hidden/removed | reports page + actions | `ADMIN-02` |
-| Blocking silently removes both users from shared circles | `lib/actions/safety.ts` | `SAFE-02` |
-| Account deletion keeps username and private uploads | `lib/actions/profile.ts` | `SAFE-03` |
+| Activity e-mails link to the board, not the activity | `lib/email/index.tsx` | `CIRC-07` |
+| Account deletion does not recompute or notify affected circles | `lib/actions/profile.ts` | `SAFE-03` |
+| Editing an activity does not notify attendees; past activities can be re-approved | `lib/actions/host.ts`, `lib/actions/admin.ts` | `DATA-01` |
 | Waitlist promotion e-mail shows a raw ISO timestamp | `lib/actions/rsvp.ts` | `DATA-03` |
 | Reminder e-mail sends the venue name as the address | `lib/jobs/reminders.ts` | `DATA-02` |
-| Hosts can check in waitlisted/cancelled members | `lib/actions/host.ts` | `DATA-05` |
 | Host “Completed” section includes cancelled activities | `app/[locale]/(app)/host/page.tsx` | `UX-04` |
 | Locale switch drops filters/search/page | `components/features/nav/locale-switcher.tsx` | `I18N-05` |
 | Error page's retry button says “Something went wrong” | `app/[locale]/error.tsx` | `UX-03` |
@@ -176,27 +165,28 @@ These are absent, not merely broken. They are listed separately so they are not 
 
 | Journey | Status | Notes |
 | --- | --- | --- |
-| Sign up → email OTP → onboarding → home | **Works (not re-run here)** | E2E spec exists; requires a seeded disposable DB. Email uniqueness race remains. |
+| Sign up → email OTP → onboarding → home | **Works (not re-run here)** | E2E spec exists; requires a seeded disposable DB. |
 | Sign in → session persistence → sign out | **Works** | DB session, 30-day cookie, sign-out clears the client session. |
 | Profile edit → avatar upload → updated profile | **Works (Cloudinary required)** | Upload E2E spec exists; uploads are disabled without all three Cloudinary credentials. |
 | Discover activity → RSVP → address revealed | **Works** | Phone verification gate, capacity transaction, waitlist. |
-| Match → enter circle → chat → vote | **Broken** | `CIRC-01`, `CIRC-02`, `CIRC-03`. |
-| Notification → open notification centre | **Broken** | `/notifications` does not exist. |
-| Report user/activity → admin review → action | **Partial** | Report and resolution exist; no content preview, no message hide/remove, no audit. |
+| Match → accept → active circle → chat → vote | **Works (code path)** | Accept/decline and three-accept activation are implemented; needs a seeded integration test and pending migrations applied. |
+| Notification → open notification centre → mark read | **Works** | `/notifications` exists; RBAC and mark-read actions are wired. |
+| Report user/activity → admin review → action | **Partial** | Target preview, hide and resolution exist; no audit log or appeal path. |
 | Admin sign-in → user management → role change | **Works** | Self-demotion/suspension is blocked. No audit log. |
-| Admin rematch queue → resolve request | **Broken** | List only; no resolve action. |
+| Admin rematch queue → resolve request | **Works** | Resolution action updates status and notifies the member. |
 | Discover people → connect → message | **Missing** | No discovery, connections or DMs. |
 | Join a community → post → react | **Missing** | No public communities, posts or reactions. |
 
-### B.6 Route inventory (34 pages)
+### B.6 Route inventory (35 pages)
 
 Marketing: `/`, `/guidelines`, `/credits`.  
 Auth: `/sign-in`, `/sign-up`, `/verify`, `/forgot-password`, `/reset-password`.  
-Member app: `/dashboard`, `/home`, `/activities`, `/activities/[id]`, `/circles`, `/circles/[id]`, `/profile/[id]`, `/settings`, `/onboarding`, `/host`, `/host/new`, `/host/[id]`, `/host/[id]/edit`.  
+Member app: `/dashboard`, `/home`, `/activities`, `/activities/[id]`, `/circles`, `/circles/[id]`, `/notifications`, `/profile/[id]`, `/settings`, `/onboarding`, `/host`, `/host/new`, `/host/[id]`, `/host/[id]/edit`.
+
 Admin: `/admin`, `/admin/users`, `/admin/reports`, `/admin/host-applications`, `/admin/activities`, `/admin/venues`, `/admin/locations`, `/admin/circles`, `/admin/circles/[id]`, `/admin/metrics`.  
 System: `/[locale]/[...rest]`, `/access-denied`, root `/` redirect, icon and manifest routes.
 
-**Not present:** `/notifications`, `/messages`, `/people`, `/connections`, `/communities`, `/privacy`, `/terms`, `/sitemap.xml`, `/robots.txt`.
+**Not present:** `/messages`, `/people`, `/connections`, `/communities`, `/privacy`, `/terms`, `/sitemap.xml`, `/robots.txt`.
 ---
 
 ## C. Detailed Issues
@@ -205,9 +195,9 @@ System: `/[locale]/[...rest]`, `/access-denied`, root `/` redirect, icon and man
 
 | Severity | Count | Meaning in this report |
 | --- | --- | --- |
-| Critical | 2 | Core product unusable or confirmed data loss; must be fixed before any user-facing deployment. |
-| High | 17 | Serious security, privacy, integrity, broken core journey, or launch blocker. |
-| Medium | 45 | Broken edge journeys, material UX/i18n/performance/ops gaps, or risks that need a planned fix. |
+| Critical | 0 | Core product unusable or confirmed data loss; must be fixed before any user-facing deployment. |
+| High | 7 | Serious security, privacy, integrity, broken core journey, or launch blocker. |
+| Medium | 36 | Broken edge journeys, material UX/i18n/performance/ops gaps, or risks that need a planned fix. |
 | Low | 13 | Polish, dead code, minor inconsistencies, documentation. |
 
 Basis counts: **Confirmed defects** dominate the Critical/High list; **Missing** is used for product capabilities that do not exist; **Risk** is used for credible failure modes not exercised end-to-end.
@@ -216,196 +206,53 @@ Basis counts: **Confirmed defects** dominate the Critical/High list; **Missing**
 
 ### C.1 Critical
 
-#### CIRC-01 · Critical · Circle matching dead-ends in `forming`; no activation path exists
-
-- **Category:** Core functionality / data lifecycle
-- **Files:** `lib/matching/index.ts` (circle insert `status: "forming"`; member insert `status: "invited"`), `lib/queries/circles.ts` (`getMyCircle` filters `circles.status = 'active'`), `lib/actions/circles.ts` (`requireMember` requires `circles.status = 'active'`), `app/[locale]/(app)/circles/page.tsx`, `app/[locale]/(app)/home/page.tsx`, `lib/email/index.tsx` (invite link `/circles`)
-- **Basis:** Confirmed
-- **Description:** The weekly matcher materialises every new circle with `status = "forming"` and every member with `status = "invited"`. There is no function, Server Action, admin button, cron job or SQL migration that updates a circle to `active`. `getMyCircle` only returns circles whose status is `active`, and `requireMember` rejects every circle action unless the circle is `active`. The notification type `circle_activated` exists but is never emitted.
-- **User impact:** Every matched member receives an invitation e-mail and an in-app notification that lead to `/circles`, which renders the “no circle yet” state. The circle detail page is reachable only by guessing the numeric URL, and even there posting, voting, creating a poll and leaving all fail with “unauthorized”. The product's central promise — meeting a small local circle — cannot happen. Re-running matching excludes these users because they already have an `invited` membership, so they are stranded indefinitely.
-- **Reproduction:**
-  1. Seed at least six onboarded, phone-verified members with compatible preferences.
-  2. Run `npm run matching`.
-  3. Inspect the database: `circles.status = 'forming'`, `circle_members.status = 'invited'`.
-  4. Sign in as one of those members → `/en/circles` shows no circle; `/en/home` shows no circle.
-  5. Open `/en/circles/<id>` directly → the page renders (membership status is not `left`/`declined`), but posting or voting returns an unauthorized error.
-  6. Sign in as admin → `/en/admin/circles` lists the circle, but there is no “activate” control.
-- **Recommended solution:** Define and implement the intended lifecycle. At minimum: (a) add `acceptCircleInvite` / `declineCircleInvite` actions, (b) activate the circle when the accepted count reaches the minimum (or immediately, if acceptance is not a product requirement), (c) add admin activate/archive controls, (d) make `getMyCircle` return `forming`/`invited` circles with a clear invitation CTA instead of hiding them, (e) point invitation e-mails/notifications at `/circles/{id}`, and (f) migrate existing `forming` circles. Enforce `active` membership in `requireMember` only after acceptance.
-- **Acceptance criteria:** Two fresh members accept → circle becomes `active` → both see it in `/circles` and `/home` → both can post and vote → declining removes the member and returns them to the matching pool. Covered by an integration test.
-
-#### CIRC-02 · Critical · One member's poll vote deletes every member's votes
-
-- **Category:** Data integrity / core functionality
-- **Files:** `lib/actions/circles.ts:119-124`
-- **Basis:** Confirmed
-- **Description:** The vote transaction executes `await tx.delete(pollVotes).where(eq(pollVotes.pollId, input.pollId));` before inserting the caller's choices. The deletion is scoped by poll only, not by user. Every vote in the circle's poll is erased and replaced by the current voter's selection.
-- **User impact:** The time poll is the mechanism by which a new circle chooses its first meetup. A second voter silently destroys the first voter's choice; the final result reflects only the last person to vote (or the last multi-select). Members see vote counts collapse without explanation. This is confirmed data loss in a core flow and destroys trust in the matching experience.
-- **Reproduction:**
-  1. Create an active circle with two members and an open poll with options A/B/C.
-  2. Member 1 votes for A.
-  3. Member 2 votes for B.
-  4. Query `poll_votes`: only member 2's B vote remains; member 1's A vote is gone.
-  5. Member 1's UI now shows no selection and the total vote count drops.
-- **Recommended solution:** Scope the delete to the caller: `and(eq(pollVotes.pollId, input.pollId), eq(pollVotes.userId, user.id))`, then insert the new selection. The existing unique index `poll_votes_unique (poll_id, user_id)` already enforces one row per user per poll; use `onConflictDoUpdate` or delete-then-insert inside the transaction. Add a unit/integration test with two users and multi-select.
-- **Acceptance criteria:** Two users vote independently; both selections and the aggregate counts persist; changing one user's vote replaces only that user's rows.
-
----
+No open Critical issues remain. The circle lifecycle and poll vote loss findings were remediated after the audit and removed from this report.
 
 ### C.2 High
 
-#### CIRC-03 · High · No invitation accept/decline, so `invited` is permanent
-
-- **Category:** Core functionality / consent
-- **Files:** `lib/matching/index.ts` (members inserted as `invited`), `lib/actions/circles.ts` (only `leaveCircle` changes membership), `app/[locale]/(app)/circles/[id]/page.tsx` (invited members can view), `lib/db/schema.ts` (`circle_members.status`: invited/active/left/declined)
-- **Basis:** Confirmed
-- **Description:** `invited` and `declined` are modelled in the schema, and `requireMember` treats invited members as members (it only rejects `left` and `declined`). But there is no accept action, no decline action, no UI, and no notification prompting a choice. If CIRC-01 is fixed by auto-activating circles, invitees would become able to post without ever consenting; if it is fixed by requiring acceptance, no acceptance can occur.
-- **User impact:** No consent boundary around being placed in a circle; no way to decline a poor match; member counts (which count only `active`) stay at zero; the circle never reaches quorum. Members who dislike the group can only “leave” after the fact.
-- **Reproduction:** Run matching, open the circle URL as an invited member, inspect `circle_members.status` — it remains `invited` indefinitely; inspect the page for any accept/decline control — none exists.
-- **Recommended solution:** Add `acceptCircleInvite` and `declineCircleInvite` actions with `createAction`, ownership and status guards, revalidation, and notifications to the circle creator/admin. Set `joinedAt` on acceptance. Recompute circle status in one place. Add the CTA to the circle card and the invite e-mail deep link.
-- **Acceptance criteria:** Invitee can accept (membership becomes `active`, counts update) or decline (membership becomes `declined`, seat returns to matching); actions are idempotent and audited.
-
-#### CIRC-04 · High · Notification bell links to a route that does not exist
-
-- **Category:** Broken journey / notifications
-- **Files:** `components/features/nav/notification-bell.tsx:13` (`href="/notifications"`), `app/[locale]/` route tree (no `notifications` page), `lib/actions/notifications.ts` (actions exist but are unused), `lib/queries/notifications.ts` (`listNotifications` exists but is unused)
-- **Basis:** Confirmed
-- **Description:** The bell is rendered in the member header and links to `/notifications`. The production build's route table contains no `/[locale]/notifications` route, and the repository has no page for it. `markAllReadAction`, `markReadAction` and `listNotifications` are implemented but never called from a UI.
-- **User impact:** Every click on the bell produces a 404. The unread badge can never be cleared through the product. All notification-driven journeys — circle invitation, waitlist promotion, host decision, report update, feedback request — dead-end. Users learn to ignore the bell.
-- **Reproduction:** Sign in, click the bell in the header → 404 page; inspect the build route list → no notifications route; search for `markAllReadAction` usages → none.
-- **Recommended solution:** Add `app/[locale]/(app)/notifications/page.tsx` using `listNotifications`, with an empty state, per-item links, timestamps in Asia/Dhaka, and mark-one/mark-all actions. Add the route to `ruleFor` in `lib/rbac.ts` (member section) and to the bottom navigation or user menu if appropriate. Add an E2E test: bell → list → mark all → badge clears.
-- **Acceptance criteria:** Bell opens a localized list; unread count drops on read; deep links resolve; no 404.
-
-#### CIRC-05 · High · Notification preferences are stored but never enforced
-
-- **Category:** Privacy / notifications
-- **Files:** `lib/db/schema.ts:244-248` (`user_settings` columns), `lib/actions/profile.ts:57-71` (`updateNotificationPrefs`), `lib/notify.ts` (unconditional insert), `lib/email/index.tsx` and all senders, `lib/jobs/reminders.ts`, `lib/jobs/feedback.ts`, `lib/matching/index.ts`, `lib/actions/rsvp.ts`
-- **Basis:** Confirmed
-- **Description:** The settings page exposes e-mail toggles for circle invites, activity reminders, feedback requests and general mail, plus an in-app toggle. The values are written to `user_settings`, but no sender reads them. `notify()` inserts unconditionally; every e-mail function is called unconditionally by matching, jobs, RSVP promotion and admin actions.
-- **User impact:** A member who turns off reminders still receives them; a member who disables in-app notifications still accumulates rows; there is no unsubscribe link in any e-mail. This is a trust and compliance problem, and it makes the settings UI misleading.
-- **Reproduction:** Turn off all notification preferences in `/settings`, run `npm run reminders` (or trigger a waitlist promotion), and observe that the notification row and e-mail are still produced.
-- **Recommended solution:** Centralise a `shouldNotify(userId, channel, type)` policy in `lib/notify.ts` / `lib/email`, map each notification type to its preference column, and call it from every sender. Add a signed unsubscribe token to e-mails that lands on a preference page without requiring sign-in. Backfill a test matrix (type × channel × preference).
-- **Acceptance criteria:** Disabling a category prevents both channels; enabling restores them; transactional/security mail (password reset, account suspension) is exempt and documented; unsubscribe works.
-
-#### CIRC-06 · High · Activity attendee identities are exposed to every onboarded member
-
-- **Category:** Privacy / safety
-- **Files:** `lib/queries/activities.ts:359-374` (`getActivityAttendees` returns every RSVP for the activity with no status or viewer filter), `app/[locale]/(app)/activities/[id]/page.tsx` (renders every returned name/avatar to any signed-in member)
-- **Basis:** Confirmed
-- **Description:** `getActivityAttendees` selects all rows from `rsvps` for the activity, inner-joins `users`, and returns name/avatar/status/checked-in. The detail page calls it unconditionally and renders the full list. There is no check that the viewer is going, the host, or an admin; cancelled and waitlisted people are included; blocked users are not filtered.
-- **User impact:** Any member can enumerate exactly who is attending (and who is waitlisted for) any activity, including women-only activities, by opening the public activity page. This enables stalking, harassment, social pressure and unwanted contact, and it undermines the “safe and welcoming” promise. It also exposes people who cancelled, which they reasonably expect not to be public.
-- **Reproduction:** Sign in as a member with no RSVP, open an approved activity with several attendees, and observe the “Attendees” list with names and avatars. Compare with `rsvps` to see waitlisted/cancelled entries included.
-- **Recommended solution:** Return only aggregate counts to non-attendees; render the identity list only to `going` members, the host and admins. Filter `cancelled` and (for non-hosts) `waitlist`, and filter blocked pairs. Consider an opt-in “show me in attendee lists” setting. Add a two-account E2E test.
-- **Acceptance criteria:** A signed-in non-attendee sees only “N going”; a confirmed attendee sees going members; waitlisted/cancelled identities are never exposed to other members; blocked users are hidden.
-
-#### CIRC-07 · High · Invitation and lifecycle e-mails link to generic, locale-less pages
+#### CIRC-07 · High · Activity e-mails link to the board instead of the activity
 
 - **Category:** Broken journey / i18n
-- **Files:** `lib/email/index.tsx:173` (invite → `${appUrl()}/circles`), `:205` (promotion → `${appUrl()}/activities`), `:234` (reminder → `${appUrl()}/activities`), `:289` (feedback → `${appUrl()}/activities`); only `sendAccountExistsEmail` uses `/${locale}/sign-in`
+- **Files:** `lib/email/index.tsx:209` (promotion → `${appUrl()}/activities`), `:242` (reminder → `${appUrl()}/activities`), `:304` (feedback → `${appUrl()}/activities`); invite (`:175`) and settings footers are already locale-aware.
 - **Basis:** Confirmed
-- **Description:** E-mail buttons use absolute URLs without a locale prefix and, for invites, without the circle ID. Bangla recipients are routed through next-intl's default locale (English), and the invite button lands on the circle list — which, because of CIRC-01, is empty. Reminder and feedback buttons land on the general activities board rather than the specific activity.
-- **User impact:** Invitations appear broken (“there is no circle”), Bangla users are forced into English, and reminders/feedback require the user to find the activity again. This compounds CIRC-01 and reduces the effectiveness of every lifecycle e-mail.
-- **Reproduction:** Trigger a circle invite / waitlist promotion / reminder with a user whose `locale = 'bn'`; inspect the href. It is `http://host/circles` or `/activities`, not `/bn/circles/{id}`.
-- **Recommended solution:** Centralise link building: `activityUrl(id, locale)`, `circleUrl(id, locale)`, `settingsUrl(locale)`, using the recipient's stored locale and the entity ID. Add an unsubscribe link at the same time (CIRC-05). Test with both locales.
-- **Acceptance criteria:** Every transactional e-mail deep-links to the exact entity and the recipient's language; links work when the recipient is signed out (redirect to sign-in preserves the destination).
+- **Description:** Circle invites and notification-settings links now include the recipient's locale and the circle ID. The three activity e-mails still link to the general activities board and do not accept an `activityId`, so a reminder, waitlist promotion or feedback request cannot open the activity it refers to.
+- **User impact:** Members must search the board for the activity named in the e-mail; reminders and feedback requests lose their call to action, especially for Bangla recipients who still land on the localized board but not the item.
+- **Reproduction:** Trigger a waitlist promotion, reminder or feedback request with a user whose `locale = 'bn'`; inspect the href. It is `http://host/bn/activities`, not `/bn/activities/{id}`.
+- **Recommended solution:** Add `activityId` to the three e-mail inputs and centralise `activityUrl(id, locale)`. Use the recipient's stored locale and the entity ID in every caller (`lib/actions/rsvp.ts`, `lib/jobs/reminders.ts`, `lib/jobs/feedback.ts`). Test both locales.
+- **Acceptance criteria:** Every activity e-mail opens `/en|bn/activities/{id}`; links work when signed out (redirect to sign-in preserves the destination); both locales are covered by a test.
 
-#### AUTH-01 · High · `users.email` has no unique constraint or index
-
-- **Category:** Authentication / data integrity / performance
-- **Files:** `lib/db/schema.ts:43` (`email: text("email").notNull()`), `:72-76` (indexes: area, status, phone only); Better Auth email/password plugin
-- **Basis:** Confirmed
-- **Description:** The database does not enforce uniqueness on `users.email`, and there is no index on it. Only `username` is unique. Better Auth performs an application-level “does this email exist?” check during sign-up, which is racy under concurrent requests. Password reset and sign-in lookups also scan the table.
-- **User impact:** Two concurrent sign-ups can create two accounts with the same email; subsequent sign-in/reset behaviour depends on row order, and one user may be unable to recover their account. As the table grows, every email lookup becomes a sequential scan, slowing authentication and adding load under attack.
-- **Reproduction:** Inspect the generated SQL / `\d users` — no unique index on `email`. A direct `insert into users (id, name, email) values (...), (...)` with the same email succeeds. (Do not run this against shared data.)
-- **Recommended solution:** Add a unique index on `lower(email)` (or a normalized email column), deduplicate existing rows first, and handle the unique-violation in the sign-up path with a friendly “account exists” response. Add `verifications.identifier` indexing at the same time (DATA-09). Generate a migration and test concurrent sign-up.
-- **Acceptance criteria:** Duplicate email insert fails at the database; sign-up returns a deterministic error; login/reset use an index; migration is reversible and documented.
-
-#### AUTH-02 · High · Phone OTP delivery fails silently and can log codes in production
+#### AUTH-02 · High · Production only warns when SMS is unconfigured
 
 - **Category:** Authentication / security / reliability
-- **Files:** `lib/env.ts:33` (`SMS_PROVIDER` defaults to `"console"`), `lib/sms/index.ts:14-19` (console provider always `console.log`s the code), `lib/auth.ts:176-187` (`sendOTP` calls `sendSms` and swallows every error)
+- **Files:** `lib/env.ts:92-97` (warns only), `lib/sms/index.ts:16-23` (console provider throws in production), `lib/auth.ts:184-191` (delivery errors propagate)
 - **Basis:** Confirmed
-- **Description:** `SMS_PROVIDER` is optional and defaults to `console`. The console provider prints the full OTP to the server log in every environment. If Twilio credentials are absent or the API fails, `sendOTP` catches the error, logs a warning, and returns normally, so Better Auth reports success and the UI says “code sent”. `smsEnabled` is exported but the auth sender does not check it.
-- **User impact:** In production without Twilio, users can never verify their phone, so they can never RSVP (the action is gated on `verified-phone`), but the UI gives no actionable error. If `SMS_PROVIDER=console` is used in production, one-time codes are written to logs — an account-takeover vector for anyone with log access. Twilio outages are invisible.
-- **Reproduction:** Set only `DATABASE_URL` and `BETTER_AUTH_SECRET` in a production-like environment, request a phone code, and observe “sent” in the UI, a warning in logs, and no SMS. With `SMS_PROVIDER=console`, observe the code in the log.
-- **Recommended solution:** Fail fast at startup in production when no real SMS provider is configured (or make phone verification optional and hide the gate). Never log OTPs outside explicit dev mode; make the console provider refuse production. Propagate delivery failure to the client with a retry path. Add provider health metrics and an alert.
-- **Acceptance criteria:** Production cannot boot with the console provider; a failed send is visible to the user and monitored; OTPs never appear in production logs; Twilio configuration is validated.
+- **Description:** The console provider now refuses production, OTPs are no longer logged there, and `sendOTP` propagates delivery failures instead of reporting success. The remaining gap is boot-time validation: `SMS_PROVIDER=console` in production only emits a warning, so the app starts with a phone-verification gate that cannot work.
+- **User impact:** A deployment without Twilio looks healthy while every phone OTP fails. Members who need the verified-phone gate for RSVP cannot complete it, and operators may miss the single startup warning. Twilio outages are still not surfaced to monitoring.
+- **Reproduction:** Set `NODE_ENV=production` with `SMS_PROVIDER=console` and no Twilio credentials; the build/start succeeds with a warning, and requesting a phone code fails at send time.
+- **Recommended solution:** Fail fast at startup in production when the console provider is selected (or disable and hide phone verification). Expose `smsEnabled` through the health endpoint, and alert on repeated send failures.
+- **Acceptance criteria:** Production cannot boot with the console provider, or phone verification is explicitly disabled; a failed send is visible to the user and monitored; OTPs never appear in production logs.
 
-#### ADMIN-01 · High · Circle rematch requests cannot be resolved
-
-- **Category:** Admin panel / broken workflow
-- **Files:** `lib/queries/admin.ts:191-206` (`listOpenCircleRequests`), `app/[locale]/(admin)/admin/circles/page.tsx` (renders the queue), `lib/actions/circles.ts:196-216` (insert only), `circle_requests.status` (`open`/`handled`)
-- **Basis:** Confirmed
-- **Description:** Members can submit a rematch request; admins see a list and a dashboard count. There is no Server Action, button or SQL path that updates `circle_requests.status` to `handled`. The insert path also refuses a second request while one is open.
-- **User impact:** The queue grows monotonically; the dashboard “pending requests” KPI can never reach zero; members who are unhappy in a circle wait forever; admins have no way to record that they acted.
-- **Reproduction:** Submit a rematch request as a member, open `/en/admin/circles`, observe the request. Search the codebase for an update on `circleRequests` — only the insert exists. The only status update is impossible from the UI.
-- **Recommended solution:** Add `resolveCircleRequest` (handled/dismissed + note) with `createAction`, admin authorization, revalidation and a notification to the member. Decide the follow-up: rematch immediately, mark the member eligible for the next run, or leave the circle. Add pagination/filtering.
-- **Acceptance criteria:** Admin can resolve a request; count decreases; member is notified; action is audited; double-resolution is idempotent.
-
-#### ADMIN-02 · High · Reports cannot lead to message moderation; admins moderate blind
-
-- **Category:** Safety / moderation
-- **Files:** `app/[locale]/(admin)/admin/reports/page.tsx:53-68` (raw `report.reason`, `report.targetType` + ID, ISO timestamp, no target preview/link), `lib/actions/admin.ts:58-91` (`resolveReport` only sets status/note), `lib/db/schema.ts` (`circle_messages.hiddenAt` exists), `app/[locale]/(app)/circles/[id]/page.tsx` (renders hidden state)
-- **Basis:** Confirmed
-- **Description:** The report queue shows the reporter, a raw enum reason, a target type and numeric ID, and optional evidence. It does not show the reported message, activity or profile, and there is no link to the target. The only actions are “actioned” and “dismissed”; nothing writes `circle_messages.hidden_at`, and there is no action to hide an activity or suspend a user from the report. Admins are told message contents are private to members, but they are also expected to moderate them.
-- **User impact:** Harassment and abusive messages remain visible after a report is “actioned”. Moderators cannot judge context without manually querying the database. Safety response is slow and inconsistent, and there is no record of what was hidden or why.
-- **Reproduction:** Report a circle message; open the admin report queue; observe the raw reason/ID and the absence of any content or hide control. Resolve the report; the message is still visible in the circle.
-- **Recommended solution:** Add a moderation detail view that fetches the reported entity with a strict admin-only query (redact unrelated messages), plus actions: hide message, remove message, suspend author, dismiss. Record `hiddenAt`, `hiddenBy`, reason; notify the author and reporter. Add an audit entry. Keep ordinary circle chat private — only the reported item is exposed.
-- **Acceptance criteria:** Admin can read the reported item, hide it, and see it disappear for members; the action is audited; the reporter is notified; unrelated chat stays private.
-
-#### SAFE-01 · High · No privacy or discoverability controls; gender, age and exact area are public
-
-- **Category:** Privacy / safety
-- **Files:** `lib/queries/users.ts:26-70` (`getPublicProfile` selects the full user row and returns gender, birth year, area), `app/[locale]/(app)/profile/[id]/page.tsx`, `app/[locale]/(app)/activities/[id]/page.tsx` (area/category names), `lib/db/schema.ts` (`users` has no visibility columns)
-- **Basis:** Confirmed / Missing
-- **Description:** Any onboarded member can open any profile by ID and see gender, birth year (hence age), exact area, bio, interests and join date. There is no profile-visibility setting, no field-level privacy, no “discoverable” toggle, and no coarse-location option. Blocking does not hide the profile. For a product focused on small-circle safety in Bangladesh, this is a significant exposure.
-- **User impact:** Women, younger members and people in small villages/wards can be identified and located; a blocked person can still browse the profile; members cannot opt out of discovery. This creates stalking, harassment and social-risk exposure that the product's own guidelines do not address.
-- **Reproduction:** Sign in as member A, open member B's profile from an activity, and observe gender/age/area. There is no privacy control in `/settings`. Block B and reopen the profile — it still renders.
-- **Recommended solution:** Add visibility settings (profile public to members / connections only; show gender/age/area as exact/coarse/hidden), default to the safer option, hide blocked profiles in both directions, and expose only area labels appropriate to the viewer. Document the data model and add tests.
-- **Acceptance criteria:** A member can hide gender/age/exact area; blocked profiles are inaccessible; defaults are safe; public activity pages show only coarse location.
-
-#### SAFE-02 · High · Blocking silently removes both users from every shared circle
-
-- **Category:** Safety / data integrity
-- **Files:** `lib/actions/safety.ts:84-99` (raw `update circle_members set status='left'` for both users in any shared active circle)
-- **Basis:** Confirmed
-- **Description:** A block is implemented as a mutual, irreversible exit from every shared circle. The update runs outside a transaction, does not recompute the circle's status, does not notify the other members or the blocked user, and does not create an audit record. Unblocking does not restore memberships.
-- **User impact:** Blocking one person can dissolve the blocker's own circle and strand the other members; a circle can fall below three active members but remain `active`; other members have no explanation. This is a surprising, destructive side effect of a safety control and may deter victims from using it.
-- **Reproduction:** Create an active circle with A, B and C. A blocks B. Inspect `circle_members`: both A and B are `left`; the circle status is unchanged; C sees a two-person active circle with no notice.
-- **Recommended solution:** Separate “block” from “leave circle”. Block should hide content and prevent matching; if the pair cannot coexist, prompt the blocker to leave (or move one member) explicitly. Recompute circle status in a transaction, notify affected members, and audit. Add tests for one shared circle and multiple circles.
-- **Acceptance criteria:** Blocking hides the pair's content; the blocker is not silently removed from unrelated social context without consent; circle status/counts are consistent; all affected members are notified.
-
-#### SAFE-03 · High · Account deletion leaves identity fragments, private uploads, and silent cancellations
+#### SAFE-03 · High · Account deletion leaves affected circles inconsistent
 
 - **Category:** Privacy / data lifecycle
-- **Files:** `lib/actions/profile.ts:100-145` (`deleteAccount`), `lib/uploads/server.ts` (`deleteUserPublicUploads`), `app/[locale]/(app)/settings/page.tsx`
+- **Files:** `lib/actions/profile.ts:132-223` (`deleteAccount`), `lib/db/schema.ts` (`circle_members`, `circles`), `app/[locale]/(app)/settings/page.tsx`
 - **Basis:** Confirmed
-- **Description:** Deletion soft-deletes the user, randomises the email, clears profile fields and deletes credentials/sessions, but it **keeps `username` and `displayUsername`**, does not delete private uploads (`report_evidence`, `host_document`), cancels the user's hosted activities without notifying attendees, and leaves circle memberships as `left` without recalculating circle status or notifying remaining members. Reports and messages remain linked to the anonymised user row.
-- **User impact:** A deleted username stays reserved and can still be recognised; private documents remain in Cloudinary; attendees of a deleted host's activity are never told it was cancelled; circles silently lose members. This falls short of a credible “delete my data” promise and creates support/legal exposure.
-- **Reproduction:** Delete an account that has a username, a private report attachment, a hosted upcoming activity and a circle membership. Inspect `users.username` (still set), Cloudinary private assets (still present), the activity (cancelled, attendees not notified), and the circle (membership removed, status unchanged).
-- **Recommended solution:** Null/anonymise username and display username; delete or schedule deletion of all uploads for the user (public and private) with a documented retention exception for legal/safety evidence; notify attendees before cancelling; recompute circles; write an audit record; provide a data-export step before deletion.
-- **Acceptance criteria:** No username remains; private uploads are removed or explicitly retained under a documented policy; attendees are notified; circles are consistent; deletion is covered by a test.
+- **Description:** Deletion now clears `username`/`displayUsername`, removes all user uploads (public and private), cancels hosted activities, notifies attendees, hides privacy fields and deletes credentials/sessions. The remaining gap is circle state: memberships are set to `left` without recomputing the circle's status or notifying the members who stay. There is also no pre-deletion data export or documented retention policy for safety evidence.
+- **User impact:** A circle can remain `active` below its minimum size, and remaining members get no explanation when someone disappears. The deletion flow still falls short of a complete “delete my data” promise because export and evidence-retention rules are undocumented.
+- **Reproduction:** Delete an account that belongs to an active circle. Inspect `circle_members` (status `left`) and `circles` (status unchanged); check the remaining members' notifications (none).
+- **Recommended solution:** Recompute circle status in the same transaction and notify remaining members; document a retention exception for reports/evidence; add a data-export step before deletion; cover deletion with an integration test.
+- **Acceptance criteria:** No username or private upload remains outside the documented exception; affected circles are recomputed and remaining members notified; export/retention is documented; deletion is covered by a test.
 
-#### DATA-01 · High · Editing or cancelling an activity breaks RSVP and capacity integrity
+#### DATA-01 · High · Activity edits are silent and past activities can be re-approved
 
 - **Category:** Data integrity / host workflow
-- **Files:** `lib/actions/host.ts` (update resets status to `pending`; cancel sets `cancelled`), `lib/actions/admin.ts` (approve/re-approve), `lib/queries/activities.ts` (attendee list and counts), `lib/db/schema.ts` (`rsvps`)
+- **Files:** `lib/actions/host.ts` (`updateActivity`, `cancelActivity`), `lib/actions/admin.ts` (`reviewActivity`), `lib/queries/activities.ts`, `lib/db/schema.ts` (`rsvps`)
 - **Basis:** Confirmed
-- **Description:** Editing an approved activity returns it to `pending` for re-review, but existing RSVPs stay `going` and capacity can be lowered below the number of going members; re-approval then oversells. Cancelling an activity does not cancel RSVPs, so the attendee list and “going” count still show confirmed people; re-approving a past activity is possible. No attendee is notified when the time, venue, capacity or status changes.
-- **User impact:** Members can hold confirmed spots for an activity that is no longer approved or has moved; hosts can unintentionally oversell; cancelled activities still advertise attendees; attendees learn about changes only by revisiting the page. This is a trust and safety issue for real-world meetups.
-- **Reproduction:** Create an approved activity with 6 going members and capacity 8. Edit it and set capacity to 4; re-approve. The UI still shows 6 going with capacity 4. Cancel it; the attendee list still shows 6 going.
-- **Recommended solution:** Introduce an explicit activity state machine and keep RSVP/status transitions in one transaction: cancel RSVPs (or mark them “activity_cancelled”) on cancel; reject capacity below `going`; notify attendees on material edits; prevent re-approval of past/completed activities; record an edit history.
-- **Acceptance criteria:** Capacity can never be below going; cancelled activities show no confirmed attendees; edits notify attendees; re-approval respects dates and status; tests cover edit/cancel/re-approve.
-
-#### SEC-01 · High · No security headers, CSP, HSTS or frame protection
-
-- **Category:** Security / production readiness
-- **Files:** `next.config.ts` (no `headers()` block, no `poweredByHeader: false`), `proxy.ts` (no header injection)
-- **Basis:** Confirmed
-- **Description:** The application sends no `Content-Security-Policy`, `Strict-Transport-Security`, `X-Frame-Options`/`frame-ancestors`, `Referrer-Policy`, `X-Content-Type-Options`, or `Permissions-Policy`. `X-Powered-By` is left at its default.
-- **User impact:** Reduced defence-in-depth against XSS, clickjacking, MIME sniffing, referrer leakage and protocol downgrade. A social platform with user-generated text and images should not rely solely on React escaping.
-- **Reproduction:** `curl -I https://<host>/en` (or the local build) and inspect the response headers — none of the above are present.
-- **Recommended solution:** Add a `headers()` block (or proxy middleware) with a nonce-based CSP in report-only mode first, then enforce; HSTS in production; frame-ancestors 'none'; nosniff; strict referrer policy; a minimal permissions policy; disable `X-Powered-By`. Document the allow-list for Cloudinary, Resend images and Next inline scripts.
-- **Acceptance criteria:** Headers present on HTML and API responses; CSP has no console violations in the main journeys; HSTS only over HTTPS; a security-header regression test exists.
+- **Description:** Capacity can no longer be lowered below confirmed attendees, cancelling releases every RSVP and waitlist seat, and check-in only accepts `going` members. Still missing: editing an approved activity returns it to `pending` but does not notify attendees when the time, venue or capacity changes; `reviewActivity` can approve an activity whose `startsAt` is already in the past; there is no edit history.
+- **User impact:** Members can hold a confirmed spot for a meetup whose time or venue silently changed, or for a date that has already passed. Hosts and admins cannot see what changed between approvals.
+- **Reproduction:** Create an approved activity with going members, edit its time, and inspect notifications — none. Re-approve an activity whose start date has passed — the action succeeds.
+- **Recommended solution:** Notify `going` and `waitlist` members on material edits (time, venue, capacity) before/after re-approval; reject approval when `startsAt` is in the past; record an edit history or audit entry.
+- **Acceptance criteria:** Material edits notify attendees; capacity cannot fall below going; past activities cannot be approved; cancelled activities show no confirmed attendees; tests cover edit/cancel/re-approve.
 
 #### OPS-01 · High · No error monitoring, alerting, health check or structured logging
 
@@ -472,12 +319,12 @@ Basis counts: **Confirmed defects** dominate the Critical/High list; **Missing**
 - **Impact:** Former members' identities remain visible to the circle; “N members” does not match the list; declined invitees are exposed.
 - **Repro / fix:** Leave a circle; the member still appears in the grid. Filter the list to `active` (and, for admins, show other statuses separately). Add a membership status label where needed.
 
-#### NOTIF-01 · Medium · No unsubscribe or preference link in any e-mail
+#### NOTIF-01 · Medium · No one-click unsubscribe token or List-Unsubscribe header
 
-- **Files:** `lib/email/index.tsx`, `lib/email/templates.tsx` (footer has no link), `lib/actions/profile.ts` (preferences require sign-in).
-- **Finding:** Every e-mail ends with the brand footer only. There is no unsubscribe token or link, and no List-Unsubscribe header.
-- **Impact:** Users cannot stop non-transactional mail from the e-mail itself; complaint rates and deliverability suffer; several jurisdictions require an unsubscribe mechanism.
-- **Repro / fix:** Inspect any reminder/invite e-mail — no unsubscribe. Add a signed, expiring token, a public preference page, and `List-Unsubscribe`/`List-Unsubscribe-Post` headers. Exempt security mail.
+- **Files:** `lib/email/index.tsx` (preference footer exists), `lib/actions/profile.ts` (preferences require sign-in).
+- **Finding:** Notification e-mails now link to `/settings` in the recipient's locale, but there is no signed unsubscribe token, no public preference landing page, and no `List-Unsubscribe` header. A signed-out recipient must sign in before changing preferences.
+- **Impact:** Users cannot stop non-transactional mail in one click from the e-mail itself; complaint rates and deliverability suffer; several jurisdictions require an unsubscribe mechanism.
+- **Repro / fix:** Inspect a reminder e-mail — the settings link exists, but no unsubscribe link/header. Add a signed, expiring token, a public preference page, and `List-Unsubscribe`/`List-Unsubscribe-Post` headers. Exempt security mail.
 
 #### SAFE-04 · Medium · Reports accept arbitrary target IDs and cannot be re-filed after dismissal
 
@@ -528,13 +375,6 @@ Basis counts: **Confirmed defects** dominate the Critical/High list; **Missing**
 - **Impact:** Legitimate attendees can be blocked from feedback; feedback can be submitted before the meetup, corrupting metrics.
 - **Repro / fix:** Create 51 RSVPs and submit as the last one. Query the caller's RSVP directly, require `status='completed'` and `endsAt < now`, and add tests.
 
-#### DATA-05 · Medium · Hosts can check in waitlisted or cancelled members
-
-- **Files:** `lib/actions/host.ts:229-259`.
-- **Finding:** `toggleCheckin` verifies that an RSVP row exists, not that its status is `going`. A host can mark a waitlisted or cancelled person as checked in, inflating attendance metrics and feedback eligibility.
-- **Impact:** Attendance and north-star metrics become unreliable; cancelled users may receive post-event prompts.
-- **Repro / fix:** Check in a waitlisted RSVP; it succeeds. Require `status='going'`, reject cancelled/waitlist, and recompute metrics.
-
 #### DATA-06 · Medium · Waitlist promotion races can leave a free seat unfilled
 
 - **Files:** `lib/actions/rsvp.ts:82-101`.
@@ -555,13 +395,6 @@ Basis counts: **Confirmed defects** dominate the Critical/High list; **Missing**
 - **Finding:** The generated SQL migrations and both lockfiles are excluded from the repository. A fresh clone has no migration history and no reproducible dependency tree; `db:migrate` has nothing to apply, while `db:generate` would create a new baseline from the current schema.
 - **Impact:** Production schema changes are not auditable or reproducible; two environments can drift; installs are non-deterministic. This is a serious release-engineering gap.
 - **Repro / fix:** Clone the repo into a clean directory; `drizzle/` is absent and `npm ci` cannot run. Commit migrations and one lockfile, add a migration check to CI, and remove the hardcoded one-off script.
-
-#### DATA-09 · Medium · Verification/OTP lookups have no index
-
-- **Files:** `lib/db/schema.ts:118` (`verifications` table; no index block), Better Auth email/phone OTP queries.
-- **Finding:** OTP verification and rate-limit lookups query `verifications.identifier` without an index. At scale, every code check scans the table; expired rows are not visibly pruned by the app.
-- **Impact:** Slower authentication under load and an ever-growing table.
-- **Repro / fix:** Inspect the table indexes; only the primary key exists. Add an index on `identifier` (and `expires_at` if cleanup is by expiry), document a cleanup job, and measure.
 
 #### DATA-10 · Medium · Matching has no run lock or idempotency guard
 
@@ -703,13 +536,6 @@ Basis counts: **Confirmed defects** dominate the Critical/High list; **Missing**
 - **Impact:** Weak sharing previews, duplicate-content signals, and private pages that are technically crawlable.
 - **Repro / fix:** Inspect `<head>` on `/en`, `/bn`, an activity and `/en/settings`. Add `metadataBase`, canonical/alternates per page, localized descriptions, dynamic OG for activities, noindex for app/admin/auth, and JSON-LD for public activities.
 
-#### SEC-02 · Medium · A one-off script contains a hardcoded local database credential
-
-- **Files:** `scripts/apply-migration.mjs:4` — `postgresql://postgres:[redacted]@localhost:5432/circle`.
-- **Finding:** A real-looking local password is committed in a script that is not part of the migration system. Even if local-only, it normalises credential commits and can be reused by mistake.
-- **Impact:** Credential leakage/hygiene risk; confusion about the supported migration path.
-- **Repro / fix:** Inspect the script. Delete it or read `DATABASE_URL` from the environment; rotate any credential that was ever shared; document the supported `db:migrate` flow.
-
 #### SEC-03 · Medium · Dependency audit reports nine advisories; build tooling is in production dependencies
 
 - **Files:** `package.json`, lockfile (not committed).
@@ -748,15 +574,15 @@ Basis counts: **Confirmed defects** dominate the Critical/High list; **Missing**
 #### OPS-05 · Medium · No backup, retention, or restore documentation
 
 - **Files:** `docs/operations.md`, `scripts/`, no backup job.
-- **Finding:** There is no documented database backup schedule, point-in-time recovery, upload retention, report/evidence retention, or restore drill. Account deletion (SAFE-03) leaves private assets.
+- **Finding:** There is no documented database backup schedule, point-in-time recovery, upload retention, report/evidence retention, or restore drill. Account deletion now removes identity and uploads, but the retention exception for safety evidence and the circle-consistency step are undocumented.
 - **Impact:** Data loss or an inability to restore after an incident; unclear retention obligations for safety evidence.
 - **Repro / fix:** Search the docs/scripts for backup/restore — none. Define RPO/RTO, automate backups and restore tests, document retention per table/asset class, and implement deletion/expiry jobs.
 
-#### TEST-01 · Medium · Critical paths are untested and E2E was not executed in this audit
+#### TEST-01 · Medium · Critical paths lack integration coverage and E2E was not executed in this audit
 
-- **Files:** `tests/unit/*` (7 files, 83 tests), `tests/e2e/*` (4 files, 21 cases), `vitest.config.ts`, `playwright.config.ts`.
-- **Finding:** Unit tests cover the pure matcher, waitlist rules, action wrapper, auth validation, geo, RBAC and upload policy. There are no tests for circle activation/acceptance, poll voting, notification preferences, attendee privacy, blocking side effects, feedback, jobs or admin queues. The Playwright suite covers smoke/auth/profile/RSVP/admin/messages/uploads, but requires a seeded disposable DB and Cloudinary stand-in; it was not run in this audit. No coverage threshold or CI gate exists.
-- **Impact:** The two critical defects shipped without detection; regressions in the core journey are likely.
+- **Files:** `tests/unit/*` (8 files, 93 tests), `tests/e2e/*` (4 files, 21 cases), `vitest.config.ts`, `playwright.config.ts`.
+- **Finding:** Unit tests cover the pure matcher, waitlist rules, action wrapper, auth validation, geo, RBAC, upload policy and profile privacy. There are no tests for circle activation/acceptance, poll voting, notification preferences/centre, attendee privacy, deletion circle state, blocking side effects, feedback, jobs or admin queues. The Playwright suite covers smoke/auth/profile/RSVP/admin/messages/uploads, but requires a seeded disposable DB and Cloudinary stand-in; it was not run in this audit. No coverage threshold or CI gate exists.
+- **Impact:** The fixed lifecycle, poll and privacy paths can regress without detection; the core journey still relies on manual verification.
 - **Repro / fix:** `npm run test` passes; `npm run test:e2e` requires the environment described in the README. Add integration tests for the lifecycle/poll/prefs/privacy paths, run E2E in CI with a disposable DB, and enforce coverage on the pure/logic modules.
 
 ---
@@ -765,7 +591,7 @@ Basis counts: **Confirmed defects** dominate the Critical/High list; **Missing**
 
 | ID | Area | File(s) | Finding | Impact / recommended fix |
 | --- | --- | --- | --- | --- |
-| LOW-01 | Dead code | `lib/queries/circles.ts` (`getActiveCircleMemberIds`), `lib/uploads/server.ts` (`isOwnCloudinaryUrl`), `lib/geo/*` (`withinLocation`), `lib/session.ts` (`requireVerifiedPhone`), `lib/actions/notifications.ts` (`markAllReadAction`), `lib/queries/notifications.ts` (`listNotifications`) | Exports with zero call sites (verified by search). | Confusing API surface; remove or wire into the notification centre. |
+| LOW-01 | Dead code | `lib/queries/circles.ts` (`getActiveCircleMemberIds`), `lib/uploads/server.ts` (`isOwnCloudinaryUrl`), `lib/geo/*` (`withinLocation`), `lib/session.ts` (`requireVerifiedPhone`) | Exports with zero call sites (verified by search). `markAllReadAction` and `listNotifications` are now used by the notification centre. | Confusing API surface; remove or wire the remaining exports. |
 | LOW-02 | Dependencies | `package.json` | `@radix-ui/react-tooltip` has no imports; `pg` is listed alongside the runtime `postgres` driver; `drizzle-kit` is a production dependency. | Larger install/image; remove unused packages and move tooling to devDependencies. |
 | LOW-03 | Accessibility / i18n | `app/[locale]/layout.tsx` (“Skip to content”), `components/features/nav/bottom-nav.tsx` (`aria-label="Primary"`) | English-only accessibility strings. | Screen readers in Bangla hear English; move to catalogs. |
 | LOW-04 | SEO | `app/[locale]/access-denied/page.tsx` | `metadata.title = "Access denied"` hardcoded; no localized metadata. | Inconsistent language in the tab/title; generate localized metadata. |
@@ -790,7 +616,7 @@ Basis counts: **Confirmed defects** dominate the Critical/High list; **Missing**
 **Strengths.** The separation between actions, queries and pure logic is real, not aspirational. The action wrapper centralises session → suspension → role/phone gate → rate limit → validation → handler → revalidation, which removes a large class of per-action mistakes. The `ActionError("namespace.key")` convention keeps user-visible errors translatable and prevents stack traces leaking to clients. Upload ownership and private-asset handling are unusually mature.
 
 **Weaknesses.**
-- The **domain lifecycle is not modelled**. `forming`, `invited`, `active`, `declined`, `left`, `pending`, `approved`, `cancelled`, `completed` exist as strings, but no state machine owns transitions. This is the root cause of `CIRC-01`/`CIRC-03`/`DATA-01`; it is an architecture gap, not a missing button.
+- **The domain lifecycle is only partly modelled.** `forming`, `invited`, `active`, `declined`, `left`, `pending`, `approved`, `cancelled`, `completed` still exist as strings; accept/decline and three-accept activation now live in `lib/actions/circles.ts`, but no shared state machine owns transitions. This is the root of the remaining leave/activation edge cases (`CIRC-08`, `CIRC-09`, `DATA-01`).
 - **The proxy is heavy.** It imports Better Auth and the database client, performs a session lookup and a full user-row query on every non-public navigation, and then hands off to next-intl. It also defaults unknown paths to `public`, so a newly added protected route is only safe if someone remembers to classify it in `ruleFor`.
 - **Read queries are page-shaped, not reusable.** `getCircleBundle`, `getActivityDetail` and `getAdminCircleDetail` return large object graphs and run several sequential queries. This is acceptable at current scale but makes caching, pagination and reuse harder.
 - **Route groups are invisible in the URL**, so the policy is keyed on the first path segment. That is workable, but it couples `lib/rbac.ts` to URL structure and makes nested resources (e.g. `/admin/circles/[id]`) depend on the first segment only.
@@ -807,23 +633,21 @@ Basis counts: **Confirmed defects** dominate the Critical/High list; **Missing**
 - Soft deletes are respected in the main reads (`users.deleted_at`, `circles.deleted_at`), and the location tree is idempotently upserted.
 
 **Gaps.**
-- **`users.email` is neither unique nor indexed** (`AUTH-01`). This is the most important schema defect.
-- **`users.phone_number` is indexed but not unique**, so two accounts can verify the same phone; the phone gate is not a strong identity signal.
-- **`verifications.identifier` is unindexed** (`DATA-09`), and there is no visible cleanup policy for expired OTP rows.
-- **No committed migrations** (`DATA-08`); the schema is the source of truth only if someone runs `db:generate` and applies the result. The one-off `scripts/apply-migration.mjs` is not a migration system and contains a hardcoded credential.
+- **Email and phone uniqueness are enforced** with `uniqueIndex` on `lower(email)` and `phone_number`; `verifications.identifier` is indexed. The migration is generated but still pending.
+- **No committed migrations** (`DATA-08`); the schema is the source of truth only if someone runs `db:generate` and applies the result. The one-off `scripts/apply-migration.mjs` is not a migration system.
 - **No state-machine constraints** on circles/activities/RSVPs. The database will happily store an `active` circle with zero active members, a `going` RSVP for a cancelled activity, or a `forming` circle forever.
 - **No audit table** for admin actions (`SAFE-07`).
 - **No matching-run table/lock** (`DATA-10`), so reruns are not idempotent.
 - **`users.area_id` has no foreign key**, so a deleted/moved area leaves a dangling ID. This is documented as intentional in the project docs, but it weakens location integrity.
 - **Feedback uniqueness** includes a nullable `activity_id`, so multiple rows with `NULL` activity are allowed; not currently harmful, but not a clean constraint.
 
-**Transaction coverage.** RSVP join/cancel, matching materialisation per group, poll creation, feedback insert and account deletion use transactions. Blocking (`SAFE-02`) and the circle leave/demotion (`CIRC-08`) do not; both mutate multiple rows that should be atomic.
+**Transaction coverage.** RSVP join/cancel, matching materialisation per group, poll creation, feedback insert and account deletion use transactions. Blocking no longer mutates circle membership; the circle leave/demotion path (`CIRC-08`) still mutates multiple rows without a transaction.
 
 ### D.3 Backend and API
 
 **Validation.** Zod schemas are shared by client and server, which is the right pattern. Auth schemas are strong (username/password rules, BD phone regex, 6-digit OTP). Activity/host/message schemas contain English sentences (`I18N-03`), and a few fields validate length but not semantics (e.g. `mapUrl`).
 
-**Authorization.** Each Server Action declares an `authorize` policy (`user`, `verified-phone`, `host`, `admin`); hosted activity operations additionally check `hostId`/admin; uploads resolve ownership; the public profile excludes contact details; the venue address is gated on a confirmed RSVP. I did not find a working IDOR in profile, activity address, circle chat or admin reads. The main authorization weaknesses are **read-side** (attendee identities, public gender/age/area) and **default-public route classification**, not broken ownership checks.
+**Authorization.** Each Server Action declares an `authorize` policy (`user`, `verified-phone`, `host`, `admin`); hosted activity operations additionally check `hostId`/admin; uploads resolve ownership; the public profile excludes contact details; the venue address is gated on a confirmed RSVP. I did not find a working IDOR in profile, activity address, circle chat or admin reads. Attendee lists and profiles are now scoped by visibility, so the main authorization weakness is **default-public route classification**, not broken ownership checks.
 
 **Error handling.** `createAction` returns `{ ok, data } | { ok, error, fieldErrors? }`, translates known errors, logs unhandled ones, and never throws raw errors at the client. This is consistent and good. Forms frequently ignore `fieldErrors` (`UX-05`). Background jobs catch per-item errors and log, so a failed run can still exit successfully.
 
@@ -840,8 +664,8 @@ Basis counts: **Confirmed defects** dominate the Critical/High list; **Missing**
 **Authorization.** `lib/rbac.ts` is the single policy: sections (`public`, `member`, `host`, `admin`), roles, permissions, `homePathFor`, `decideAccess`. Route-group layouts call the server guards; actions call `authorize`; the admin panel is unreachable to members even by direct URL (the E2E spec asserts a 403). Admin self-demotion/suspension is blocked, which protects the last admin from a common footgun.
 
 **Gaps.**
-- Email is not unique at the database (`AUTH-01`).
-- Phone is not unique (`D.2`).
+- Email and phone uniqueness are database-enforced, but migrations are still pending.
+- Production only warns when SMS is unconfigured (`AUTH-02`).
 - No email change flow; username is also immutable.
 - No 2FA or step-up authentication for admins.
 - No CAPTCHA/bot defence on sign-up/OTP.
@@ -861,9 +685,7 @@ Basis counts: **Confirmed defects** dominate the Critical/High list; **Missing**
 - Soft deletes and ownership checks limit accidental data exposure.
 
 **What is missing or weak.**
-- No security headers/CSP/HSTS/frame protection (`SEC-01`).
-- OTP logging and silent SMS failure (`AUTH-02`).
-- Hardcoded local DB credential in a script (`SEC-02`).
+- Production only warns when SMS is unconfigured; delivery failures are visible but not monitored (`AUTH-02`).
 - `BETTER_AUTH_SECRET` minimum of 16 (`SEC-04`).
 - No 2FA for admins, no audit log, no CAPTCHA.
 - Nine dependency advisories, mostly low/moderate, with build tooling in production dependencies (`SEC-03`).
@@ -871,28 +693,24 @@ Basis counts: **Confirmed defects** dominate the Critical/High list; **Missing**
 - No documented incident response, key rotation, or secret-management process.
 - No penetration test or threat model; the product handles sensitive gender/location/safety data.
 
-**Verdict:** the security fundamentals are better than typical MVPs, but launch-blocking hardening (headers, unique email, OTP handling, audit, 2FA, monitoring) is incomplete.
+**Verdict:** the security fundamentals are better than typical MVPs; headers, unique email and OTP handling are fixed. Launch-blocking hardening (audit log, 2FA, SMS fail-fast, monitoring) is still incomplete.
 
 ### D.6 Privacy and safety
 
 **Protected by design:** email/phone are never selected by `getPublicProfile`; the exact venue address and map link are withheld until `going`; report evidence and host documents are private Cloudinary assets; reports are visible only to admins; blocks hide messages in the thread and exclude pairs from matching.
 
-**Exposed or missing:**
-- Attendee identities to any onboarded member, including waitlisted/cancelled (`CIRC-06`).
-- Gender, age and exact area on every profile, with no visibility controls (`SAFE-01`).
-- Blocking's destructive circle side effect (`SAFE-02`).
-- Account-deletion residue (`SAFE-03`).
-- No message hide/remove, no target preview for moderators (`ADMIN-02`).
+**Remaining exposure:**
+- Account deletion removes memberships without recomputing or notifying the affected circle (`SAFE-03`).
 - No audit log, no appeal path, no reason for suspension (`SAFE-06`, `SAFE-07`).
-- No automated content/image moderation or spam defence (`SAFE-05`).
+- No data export or documented retention policy.
 - No privacy policy/terms (`LEGAL-01`).
-- No data export or documented retention.
+- No automated content/image moderation or spam defence (`SAFE-05`).
 
 For a product explicitly aimed at safety and loneliness, these are not optional polish; they determine whether vulnerable users can trust the platform.
 
 ### D.7 Performance
 
-**Measured:** production build compiles in ~15 s; TypeScript checking ~17 s; 6 static pages; all application routes are dynamic (`ƒ`). No Lighthouse/Core Web Vitals, load test, or bundle analysis was performed, so no performance claims can be made beyond “it builds”.
+**Measured:** production build compiles in ~5 s; TypeScript checking ~12 s; 6 static pages; all application routes are dynamic (`ƒ`). No Lighthouse/Core Web Vitals, load test, or bundle analysis was performed, so no performance claims can be made beyond “it builds”.
 
 **Likely bottlenecks:**
 - `proxy.ts` session + user query per protected request.
@@ -911,7 +729,7 @@ For a product explicitly aimed at safety and loneliness, these are not optional 
 **Strengths.** A coherent design system (Radix + CVA + Tailwind v4), a restrained teal/amber palette, responsive grids, a mobile bottom nav with 56 px targets and safe-area padding, empty states on the main lists, loading skeleton, localized 404/403 pages, toast feedback, and reduced-motion-aware animations. Forms use shared primitives and labels. The landing page is content-rich and localized.
 
 **Gaps.**
-- Broken journeys dominate the perceived quality: bell → 404, match → empty circle, error → wrong button label.
+- Remaining broken journeys: activity e-mails land on the board, activity edits are silent, and the error page's retry label is wrong.
 - Data names and several strings break the Bangla experience (`I18N-01`, `I18N-02`).
 - Validation errors are not attached to fields (`UX-05`).
 - Location search is not keyboard-accessible (`UX-06`).
@@ -922,9 +740,9 @@ For a product explicitly aimed at safety and loneliness, these are not optional 
 
 ### D.9 Internationalization
 
-**Healthy:** 938 keys in both `en.json` and `bn.json`, full parity; the Bangla catalog is genuinely translated (a scan for mostly-Latin values found only the email placeholder). Locale-prefixed routing is consistent; `Link`/`router` come from `@/i18n/navigation`; the client provider sets `Asia/Dhaka`.
+**Healthy:** 975 keys in both `en.json` and `bn.json`, full parity; the Bangla catalog is genuinely translated (a scan for mostly-Latin values found only the email placeholder). Locale-prefixed routing is consistent; `Link`/`router` come from `@/i18n/navigation`; the client provider sets `Asia/Dhaka`.
 
-**Leaky:** data names (`nameEn`), hardcoded UI strings, English Zod messages, English notification titles/bodies, locale-less e-mail links, UTC ISO admin dates, server-TZ job formatting, and a locale switcher that drops query state and does not persist the preference. The catalogs are not the problem; the problem is code that bypasses them.
+**Leaky:** data names (`nameEn`), hardcoded UI strings, English Zod messages, English notification titles/bodies, activity e-mails that open the board instead of the item, UTC ISO admin dates, server-TZ job formatting, and a locale switcher that drops query state and does not persist the preference. The catalogs are not the problem; the problem is code that bypasses them.
 
 ### D.10 SEO and metadata
 
@@ -932,11 +750,11 @@ Only the landing page has a complete metadata treatment (localized title/descrip
 
 ### D.11 Testing
 
-**Unit:** 7 files, 83 tests, all passing. Coverage includes the matching core, waitlist rules, the action wrapper, auth validation, the geo tree, RBAC and upload policy. These are exactly the right pure domains to test.
+**Unit:** 8 files, 93 tests, all passing. Coverage includes the matching core, waitlist rules, the action wrapper, auth validation, the geo tree, RBAC, upload policy and profile privacy. These are exactly the right pure domains to test.
 
 **E2E:** 21 cases across smoke (11), admin (3), messages (2) and uploads (5). They exercise real auth/OTP, onboarding, RSVP/address reveal, password reset, admin 403s, report-button labels and upload ownership, against a real dev server and seeded Postgres. They were **not run in this audit** because no seeded disposable database or Cloudinary stand-in was confirmed. Playwright starts `npm run dev` itself and reuses an existing server; uploads require the Cloudinary stand-in env.
 
-**Missing:** tests for the circle lifecycle, poll voting, notification preferences/centre, attendee privacy, blocking side effects, feedback, jobs, admin queues, and any component/accessibility tests. No coverage threshold, no CI gate.
+**Missing:** tests for the circle lifecycle, poll voting, notification preferences/centre, attendee privacy, deletion circle state, feedback, jobs, admin queues, and any component/accessibility tests. No coverage threshold, no CI gate.
 
 ### D.12 Operations and production readiness
 
@@ -944,7 +762,7 @@ Only the landing page has a complete metadata treatment (localized title/descrip
 - No CI/CD or deploy configuration (`OPS-02`).
 - Migrations and lockfiles ignored (`DATA-08`), so builds are not reproducible.
 - No backup/restore/retention plan (`OPS-05`).
-- E-mail silently disabled for non-auth mail without a key (`OPS-04`); SMS silently disabled by default (`AUTH-02`).
+- E-mail silently disabled for non-auth mail without a key (`OPS-04`); SMS only warns at boot when unconfigured (`AUTH-02`).
 - No queue for jobs; cron setup is documented only at a high level; matching has no lock (`DATA-10`).
 - No feature flags, maintenance mode, or admin announcement mechanism.
 - Environment validation is a strength: required variables fail at import with readable messages, and Cloudinary warns when only the API key is set.
@@ -955,71 +773,62 @@ Only the landing page has a complete metadata treatment (localized title/descrip
 | Integration | State | Assessment |
 | --- | --- | --- |
 | Cloudinary | Signed upload, policy, ownership, private assets, signed downloads | Strong design. Requires all three credentials; uploads disabled with a clear UI message otherwise. No malware/NSFW scanning. |
-| Resend | Bilingual React Email templates | Good templates; optional key; non-auth mail silently skipped in production; no unsubscribe/List-Unsubscribe; links lack locale/entity IDs. |
-| Twilio / SMS | Pluggable provider; console fallback | Default console logs OTP; errors swallowed; no delivery reports; BD-only number validation excludes diaspora. |
+| Resend | Bilingual React Email templates | Good templates; optional key; non-auth mail silently skipped in production; no one-click unsubscribe/List-Unsubscribe; activity links lack entity IDs. |
+| Twilio / SMS | Pluggable provider; production-safe console guard | Console refuses production and errors propagate; still no boot-time fail-fast, delivery reports, or monitoring; BD-only number validation excludes diaspora. |
 | Unsplash | Landing/activity imagery with credits page | External dependency and wildcard image allow-list; no local fallback if the CDN is blocked. |
 | PostgreSQL | Drizzle + postgres-js | Sound, but no committed migrations or backup plan. |
-| Better Auth | Email/password, username, emailOTP, phoneNumber, nextCookies | Well configured; email uniqueness and OTP delivery are the weak points. |
+| Better Auth | Email/password, username, emailOTP, phoneNumber, nextCookies | Well configured; email/phone uniqueness is enforced; SMS boot validation is the remaining weak point. |
 
 ### D.14 Code quality and maintainability
 
 **Strengths:** strict TypeScript, consistent naming, small pure modules, documented “why” comments in critical places, a coherent error model, and a clear repository map in `AGENTS.md`. The code reads like it was written by someone who cares about the domain.
 
-**Debt:** dead exports (`LOW-01`), unused dependencies (`LOW-02`), a 590-line landing page, page-shaped queries, duplicated date formatting, English strings in schemas, and a few “temporary” scripts. None of this is unusual; the main risk is that the lifecycle gaps are invisible to the type system.
+**Debt:** dead exports (`LOW-01`), unused dependencies (`LOW-02`), a 590-line landing page, page-shaped queries, duplicated date formatting, English strings in schemas, and a few “temporary” scripts. None of this is unusual; the main risk is that circle/activity lifecycle transitions are still strings checked ad hoc and therefore invisible to the type system.
 
 ---
 
 ## E. Prioritized Action Plan
 
-### E.1 Phase 1 — Critical security and data integrity (target: 1–2 weeks)
+### E.1 Phase 1 — Remaining launch blockers (target: 1–2 weeks)
 
-**Goal:** make the core journey work and remove the highest-risk data/privacy defects.
+**Goal:** close the legal, observability and release-engineering gaps that still block a public launch.
 
-1. **Fix poll voting** (`CIRC-02`): scope the delete to the caller; add a two-user integration test. *0.5 day.*
-2. **Implement the circle lifecycle** (`CIRC-01`, `CIRC-03`): accept/decline actions, activation on quorum, `active` membership enforcement, admin activate/archive, migration of existing `forming` circles, deep links. *4–6 days.*
-3. **Ship the notification centre** (`CIRC-04`): page, list, mark-one/all, empty state, badge refresh, route policy. *2 days.*
-4. **Enforce notification preferences** (`CIRC-05`): central policy, all senders, unsubscribe token, test matrix. *2–3 days.*
-5. **Protect attendee identities** (`CIRC-06`): aggregate-only for non-attendees, going-only identities, blocked filter, two-account test. *1–2 days.*
-6. **Make e-mail unique and indexed** (`AUTH-01`): dedupe migration, unique lower(email), conflict handling, verification index. *1–2 days.*
-7. **Fix phone OTP reliability and logging** (`AUTH-02`): fail fast in production, no OTP logs, propagate delivery failure, Twilio validation. *1–2 days.*
-8. **Add rematch resolution** (`ADMIN-01`): action, note, notification, audit. *1 day.*
-9. **Add message moderation** (`ADMIN-02`): reported-item detail, hide/remove, author/reporter notification, audit. *2–3 days.*
-10. **Security headers and credential hygiene** (`SEC-01`, `SEC-02`): CSP report-only → enforce, HSTS, frame/nosniff/referrer/permissions, remove hardcoded credential, disable `X-Powered-By`. *1 day.*
-11. **Legal minimum** (`LEGAL-01`): localized privacy policy and terms, sign-up consent, footer links. *2–3 days including review.*
-12. **Observability minimum** (`OPS-01`): Sentry/OTel, request IDs, health endpoint, job summaries, alerts. *1–2 days.*
+1. **Legal minimum** (`LEGAL-01`): localized privacy policy and terms, sign-up consent, footer links, documented retention/deletion. *2–3 days including review.*
+2. **Observability minimum** (`OPS-01`): Sentry/OTel, request IDs, health endpoint, job summaries, alerts. *1–2 days.*
+3. **Reproducible release** (`OPS-02`, `DATA-08`): CI running typecheck/lint/unit/build, committed migrations and lockfile, deploy configuration, rollback notes. *2–3 days.*
+4. **Activity e-mail deep links** (`CIRC-07`): pass `activityId` and recipient locale, centralise `activityUrl`, test both locales. *0.5–1 day.*
+5. **SMS fail-fast** (`AUTH-02`): refuse production boot with the console provider (or disable the phone gate) and expose provider health. *0.5 day.*
+6. **Deletion circle consistency** (`SAFE-03`): recompute affected circles, notify remaining members, document evidence retention and data export. *1–2 days.*
+7. **Activity edit integrity** (`DATA-01`): notify attendees on material edits, block approval of past activities, record edit history. *1–2 days.*
+8. **Admin audit log** (`SAFE-07`): record moderation, suspension, host decisions and rematch resolutions. *1–2 days.*
 
-**Exit criteria:** a new member can be matched, accept, enter the circle, post, and vote without data loss; two members' votes coexist; the bell opens a working centre; disabled preferences suppress both channels; non-attendees cannot see attendee identities; duplicate email insert fails; production cannot boot with console SMS; a report can hide a message; security headers present; privacy/terms live; errors tracked.
+**Exit criteria:** privacy/terms live with recorded consent; errors tracked and health check green; CI builds and deploys reproducibly; activity e-mails open the activity; production cannot boot with unusable SMS; deletion leaves circles consistent; edits notify attendees; moderation actions are auditable.
 
-### E.2 Phase 2 — Broken functionality and incomplete core features (target: 2–4 weeks)
+### E.2 Phase 2 — Remaining core and edge correctness (target: 2–4 weeks)
 
-1. **Activity state machine** (`DATA-01`): cancel RSVPs, capacity floor, edit/cancel notifications, prevent re-approval of past activities, host “complete” action. *3–4 days.*
-2. **Waitlist correctness** (`DATA-06`, `DATA-03`): row lock/`SKIP LOCKED`, formatted promotion e-mail, test. *1–2 days.*
-3. **Jobs correctness** (`DATA-02`): batch queries, Asia/Dhaka formatting, correct address, job tests. *2–3 days.*
-4. **Leave/block consistency** (`CIRC-08`, `SAFE-02`): visible forming state, notify remaining members, separate block from leave, recompute circle status, transaction. *2–3 days.*
-5. **Account deletion cleanup** (`SAFE-03`): username, private uploads, attendee notification, circle recompute, export/retention doc. *2 days.*
-6. **Feedback integrity** (`DATA-04`, `DATA-05`): direct RSVP lookup, completed-only, check-in only for going. *1 day.*
-7. **Admin pagination/filters and queues** (`DATA-07`, `ADMIN-04`): users, reports, activities, hosts, circles, venues. *3–4 days.*
-8. **i18n cleanup** (`I18N-01`–`06`): `nameBn`, hardcoded strings, validation keys, notification rendering, locale switcher, Dhaka dates. *4–6 days.*
-9. **Form UX** (`UX-03`–`05`): retry label, field errors, focus management, host completed/cancelled. *2 days.*
-10. **Onboarding/phone deep links** (`UX-01`, `UX-02`): resume/step URL, working verification route. *1–2 days.*
-11. **Report validation** (`SAFE-04`) and **suspension reason/appeal** (`SAFE-06`). *1–2 days.*
-12. **PWA/mobile polish** (`LOW-09`, `LOW-13`): `viewportFit`, route skeletons, safe-area verification. *1 day.*
+1. **Notification/email polish** (`CIRC-07`, `NOTIF-01`, `DATA-02`, `DATA-03`): activity links, one-click unsubscribe, correct reminder address, formatted promotion time. *2–3 days.*
+2. **Circle consistency** (`CIRC-08`–`CIRC-11`): leave/recompute behaviour, poll closing, chat pagination/delete, member-list filtering. *4–6 days.*
+3. **Feedback integrity** (`DATA-04`): direct RSVP lookup, completed-only, host-driven completion. *1–2 days.*
+4. **Waitlist/matching races** (`DATA-06`, `DATA-10`): row lock/`SKIP LOCKED`, matching run lock, idempotency. *2–3 days.*
+5. **Jobs correctness** (`DATA-02`, `DATA-07`): batch queries, Asia/Dhaka formatting, bounded lists. *2–3 days.*
+6. **Admin queues** (`ADMIN-04`): pagination, sorting and filters for users, reports, activities, hosts, circles and venues. *3–4 days.*
+7. **i18n cleanup** (`I18N-01`–`06`): `nameBn`, hardcoded strings, validation keys, notification rendering, locale switcher, Dhaka dates. *4–6 days.*
+8. **Form/onboarding UX** (`UX-01`–`UX-06`): retry label, field errors, focus management, host completed/cancelled, onboarding resume, phone deep link, keyboard search. *2–3 days.*
+9. **Report validation and suspension workflow** (`SAFE-04`, `SAFE-06`): target ownership checks, re-file rules, reason/appeal and notification. *1–2 days.*
 
-### E.3 Phase 3 — Essential missing features for launch (target: 4–8 weeks, scope-dependent)
+### E.3 Phase 3 — Product scope and launch features (target: 4–8 weeks, scope-dependent)
 
 These are product decisions, not bug fixes. Do not launch marketing that promises them until they exist.
 
-1. **Privacy and discoverability controls** (`SAFE-01`): field-level visibility, coarse area, block semantics, profile visibility, default-safe settings.
-2. **User discovery and connections**: search by area/interest, suggested people (privacy-aware), connection request → accept/decline, mutual connections.
-3. **Messaging**: 1:1 conversations with block/report, unread counts, pagination, and either realtime or a clear “refresh” model.
-4. **Communities**: member-created public/private communities, join/leave/approval, directory, moderation roles. Decide whether this replaces or complements automatic circles.
-5. **Posts/comments/reactions** if the product is a feed; otherwise explicitly position APON as circles-first.
-6. **Notification/email preference centre** with unsubscribe and a complete type × channel matrix.
-7. **Admin audit log, interest CRUD, platform settings/flags, appeal workflow** (`SAFE-07`, `ADMIN-03`).
-8. **Email change, data export, 2FA for admins, CAPTCHA** (`AUTH` gaps).
-9. **Content/image moderation and spam defence** (`SAFE-05`).
-10. **SEO and legal completeness**: sitemap, robots, canonical/hreflang policy, per-page OG, noindex, JSON-LD; cookie notice if analytics is added.
-11. **Operations**: CI/CD, committed migrations/lockfile, backups/restore drills, retention jobs, runbooks, on-call/alerting.
+1. **User discovery and connections**: search by area/interest, suggested people (privacy-aware), request → accept/decline, mutual connections.
+2. **Messaging**: 1:1 conversations with block/report, unread counts, pagination, and a clear realtime-or-refresh model.
+3. **Communities**: member-created public/private communities, join/leave/approval, directory, moderation roles. Decide whether this replaces or complements automatic circles.
+4. **Posts/comments/reactions** if the product is a feed; otherwise explicitly position APON as circles-first.
+5. **Admin audit log, interest CRUD, platform settings/flags, appeal workflow** (`SAFE-07`, `ADMIN-03`).
+6. **Email change, data export, 2FA for admins, CAPTCHA** (`AUTH` gaps).
+7. **Content/image moderation and spam defence** (`SAFE-05`).
+8. **SEO and legal completeness**: sitemap, robots, canonical/hreflang policy, per-page OG, noindex, JSON-LD; cookie notice if analytics is added.
+9. **Operations maturity**: backups/restore drills, retention jobs, runbooks, on-call/alerting.
 
 ### E.4 Phase 4 — UI/UX, performance and accessibility (target: 2–4 weeks)
 
@@ -1039,31 +848,34 @@ These are product decisions, not bug fixes. Do not launch marketing that promise
 - Raise `BETTER_AUTH_SECRET` requirements, document rotation, add secret scanning to CI.
 - Split the landing page into sections; extract shared e-mail link builders.
 - Add coverage thresholds for pure modules and a dependency-update policy.
-- Write ADRs for the circle lifecycle, privacy model, notification matrix, and moderation policy.
+- Write ADRs for the circle lifecycle, privacy model, notification matrix and moderation policy.
 
 ### E.6 Sequencing and rough effort
 
 | Phase | Scope | Effort (dev-days) | Dependency |
 | --- | --- | --- | --- |
-| 1 | Critical + high launch blockers | 18–28 | None; start immediately |
-| 2 | Broken/incomplete core | 25–35 | Phase 1 lifecycle |
-| 3 | Launch features | 40–80 | Product scope decision |
-| 4 | UX/perf/a11y | 15–25 | Phase 1–2 |
+| 1 | Remaining launch blockers | 9–15 | None; start immediately |
+| 2 | Core/edge correctness | 20–30 | Phase 1 migrations and release path |
+| 3 | Product-scope launch features | 40–80 | Product scope decision |
+| 4 | UX/perf/a11y | 15–25 | Phases 1–2 |
 | 5 | Debt/ops maturity | Ongoing (~20%) | Continuous |
 
-A single experienced full-stack developer should expect **6–10 weeks** to reach a defensible closed beta (Phases 1–2 plus the minimum of Phase 3), and **3–5 months** to a public launch with discovery/connections/messaging if those remain in scope.
+A single experienced full-stack developer should expect **4–7 weeks** to reach a defensible closed beta (Phases 1–2), and **3–5 months** to a public launch with discovery/connections/messaging if those remain in scope.
 
 ### E.7 Launch gate checklist
 
-- [ ] No open Critical/High issue from this report.
-- [ ] Circle: match → accept → active → post/vote/leave covered by an automated test.
-- [ ] Poll: two users' votes coexist; changing a vote replaces only that user's.
-- [ ] Notification: bell → centre → mark read/all; preferences suppress both channels; unsubscribe works.
-- [ ] Privacy: non-attendee sees only counts; blocked profiles hidden; gender/age/area visibility configurable.
+- [x] No open Critical issue from this report.
+- [x] Circle: match → accept → active → post/vote/leave covered by the code path (integration test still needed).
+- [x] Poll: two users' votes coexist; changing a vote replaces only that user's rows.
+- [x] Notification: bell → centre → mark read/all; preferences suppress both channels.
+- [ ] Notification: activity e-mails deep-link to the activity; one-click unsubscribe works.
+- [x] Privacy: non-attendee sees only counts; blocked profiles hidden; gender/age/area visibility configurable.
 - [ ] Moderation: a reported message can be hidden/removed with an audit entry; suspension has a reason and appeal path.
-- [ ] Auth: duplicate email fails at the DB; phone OTP works or fails visibly; no OTPs in production logs; admin 2FA.
-- [ ] Data: migrations and lockfile committed; backup/restore drill passed; account deletion removes private assets.
-- [ ] Security: headers/CSP/HSTS live; dependency audit has no high/critical; secrets scanned.
+- [x] Auth: duplicate email fails at the DB; phone OTP failures are visible; no OTPs in production logs.
+- [ ] Auth: production cannot boot with console SMS; admin 2FA.
+- [ ] Data: migrations and lockfile committed; backup/restore drill passed; account deletion leaves circles consistent.
+- [x] Security: headers/CSP/HSTS live; hardcoded credential removed.
+- [ ] Security: dependency audit has no high/critical; secrets scanned.
 - [ ] Legal: privacy policy and terms in en/bn; sign-up consent recorded.
 - [ ] Ops: error tracking, health check, alerts, CI running typecheck/lint/unit/E2E/build.
 - [ ] Performance: Lighthouse mobile budgets met on `/en`, `/en/activities`, `/en/home`; load test at expected launch concurrency.
@@ -1080,15 +892,15 @@ A single experienced full-stack developer should expect **6–10 weeks** to reac
 | --- | --- | --- |
 | TypeScript | `npm run typecheck` | Passed (exit 0). |
 | Lint | `npm run lint` | Passed (exit 0). |
-| Unit tests | `npm run test` | Passed: 7 files, 83 tests. |
-| Production build | `npm run build` | Passed (exit 0); compiled in ~15 s; TypeScript ~17 s; 6 static pages; all app routes dynamic. |
-| i18n parity | Catalog comparison | 938 keys in each of `en.json` / `bn.json`; zero missing. |
+| Unit tests | `npm run test` | Passed: 8 files, 93 tests. |
+| Production build | `npm run build` | Passed (exit 0); compiled in ~5 s; TypeScript ~12 s; 6 static pages; all app routes dynamic. |
+| i18n parity | Catalog comparison | 975 keys in each of `en.json` / `bn.json`; zero missing. |
 | Bangla translation scan | Script over `bn.json` | Only one mostly-Latin value (an email placeholder); the catalog is genuinely translated. |
 | Dependency audit | `npm audit --omit=dev` | 9 vulnerabilities: 4 low, 5 moderate; no high/critical. |
-| Route inventory | `find app -name page.tsx` + build output | 34 pages; no `/notifications`, `/privacy`, `/terms`, `/sitemap.xml`, `/robots.txt`. |
-| Dead-export search | `grep` for call sites | `isOwnCloudinaryUrl`, `withinLocation`, `markAllReadAction`, `requireVerifiedPhone`, `getActiveCircleMemberIds`, `listNotifications` have no UI call sites. |
-| Credential scan | Inspected `scripts/apply-migration.mjs` | Hardcoded local PostgreSQL credential (redacted in this report). |
-| Security headers | Inspected `next.config.ts` | No `headers()`, CSP, HSTS, frame or referrer policy. |
+| Route inventory | `find app -name page.tsx` + build output | 35 pages, including `/notifications`; still no `/privacy`, `/terms`, `/sitemap.xml`, `/robots.txt`. |
+| Dead-export search | `grep` for call sites | `markAllReadAction` and `listNotifications` are now used by the notification centre; other unused exports remain (`LOW-01`). |
+| Credential scan | Inspected `scripts/apply-migration.mjs` | No hardcoded credential; uses `DATABASE_URL`. |
+| Security headers | Inspected `next.config.ts` | CSP, HSTS, frame, nosniff, referrer and permissions headers are present. |
 
 ### F.2 What could not be tested
 
@@ -1103,9 +915,9 @@ A single experienced full-stack developer should expect **6–10 weeks** to reac
 
 - The product described in the audit brief (connections, communities, posts, messaging, user discovery) is the intended scope; where it is absent, it is reported as missing rather than as a broken existing feature.
 - A public launch is the target; closed-beta severity may differ.
-- The `forming → active` transition is genuinely absent, not performed by an external operational script outside the repository. No such script exists in `scripts/`.
+- The `forming → active` transition is implemented in application code; the pending migrations still need to be applied before the lifecycle can run against a real database.
 - `npm run db:seed` was not run; it truncates every table and requires a disposable database.
-- No source files were changed; the only new file is this report.
+- The remediation pass changed application code and schema. This report was updated after those changes; resolved issue cards were removed rather than left as historical findings.
 
 ### F.4 How to reproduce the audit
 
@@ -1120,7 +932,7 @@ npm audit --omit=dev
 npm run test:e2e
 ```
 
-For the critical issues, inspect the cited files and run the steps in each card. The poll defect can be seen directly at `lib/actions/circles.ts:120`; the lifecycle gap by following `runMatching` → `getMyCircle` → `requireMember`; the 404 by clicking the header bell.
+For the remaining issues, inspect the cited files and run the steps in each card. The activity-email gap is visible in `lib/email/index.tsx`; the deletion circle gap in `lib/actions/profile.ts`; and the missing legal/ops surface from the route table and `package.json`.
 
 ---
 
@@ -1147,11 +959,14 @@ For the critical issues, inspect the cited files and run the steps in each card.
 
 ## Appendix B — Issue index
 
-**Critical:** CIRC-01, CIRC-02.  
-**High:** CIRC-03, CIRC-04, CIRC-05, CIRC-06, CIRC-07, AUTH-01, AUTH-02, ADMIN-01, ADMIN-02, SAFE-01, SAFE-02, SAFE-03, DATA-01, SEC-01, OPS-01, LEGAL-01, DISC-01.  
-**Medium:** CIRC-08–11, NOTIF-01, SAFE-04–07, DATA-02–10, I18N-01–06, UX-01–06, ADMIN-03–04, PERF-01–03, SEO-01–02, SEC-02–04, OPS-02–05, TEST-01.  
+**Critical:** none.
+
+**High:** CIRC-07, AUTH-02, SAFE-03, DATA-01, OPS-01, LEGAL-01, DISC-01.
+
+**Medium:** CIRC-08–11, NOTIF-01, SAFE-04–07, DATA-02–04, DATA-06–08, DATA-10, I18N-01–06, UX-01–06, ADMIN-03–04, PERF-01–03, SEO-01–02, SEC-03–04, OPS-02–05, TEST-01.
+
 **Low:** LOW-01–13.
 
 ---
 
-*End of report. Prepared as a read-only audit; no application code, schema, migration or configuration was modified.*
+*End of report. Updated after the first remediation pass; resolved issue cards were removed and the remaining findings reflect the current code. Code changes are uncommitted and migrations 0008–0010 are still pending.*

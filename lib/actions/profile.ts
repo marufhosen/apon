@@ -7,7 +7,11 @@ import { and, eq, inArray, sql } from "drizzle-orm";
 import { ActionError, type ActionContext, createAction } from "@/lib/actions/action";
 import { db } from "@/lib/db";
 import { assertSelectableLocation } from "@/lib/queries/locations";
-import { cleanupReplacedImage, deleteUserUploads, resolveOwnedImage } from "@/lib/uploads/server";
+import {
+  cleanupReplacedImage,
+  deleteUserUploads,
+  resolveOwnedImage,
+} from "@/lib/uploads/server";
 import {
   activities,
   availability,
@@ -23,6 +27,7 @@ import {
 import {
   deleteAccountSchema,
   notificationPrefsSchema,
+  privacySchema,
   profileSchema,
   settingsSchema,
 } from "@/lib/validations";
@@ -34,7 +39,12 @@ export const updateProfile = createAction({
   revalidate: (_input, user) => [`/profile/${user.id}`, "/settings", "/home"],
   handler: async (input, { user }: ActionContext): Promise<{ id: string }> => {
     if (input.areaId) await assertSelectableLocation(input.areaId);
-    const avatarUrl = await resolveOwnedImage(user.id, input.avatarUrl, "avatar", user.avatarUrl);
+    const avatarUrl = await resolveOwnedImage(
+      user.id,
+      input.avatarUrl,
+      "avatar",
+      user.avatarUrl,
+    );
     const [updated] = await db
       .update(users)
       .set({
@@ -52,6 +62,32 @@ export const updateProfile = createAction({
     if (!updated) throw new ActionError("errors.generic");
     await cleanupReplacedImage(user.avatarUrl, avatarUrl);
     return { id: updated.id };
+  },
+});
+
+/**
+ * Profile privacy. Enforced in `getPublicProfile`, not just hidden in the UI:
+ * the query returns no bio, interests, area or sensitive fields unless the
+ * viewer is allowed to see the full profile.
+ */
+export const updatePrivacySettings = createAction({
+  schema: privacySchema,
+  revalidate: (_input, user) => [`/profile/${user.id}`, "/settings"],
+  handler: async (input, { user }: ActionContext) => {
+    const [updated] = await db
+      .update(users)
+      .set({
+        profileVisibility: input.profileVisibility,
+        showGender: input.showGender,
+        showAge: input.showAge,
+        areaVisibility: input.areaVisibility,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, user.id))
+      .returning({ id: users.id });
+
+    if (!updated) throw new ActionError("errors.generic");
+    return { saved: true };
   },
 });
 
@@ -76,7 +112,10 @@ export const updateLanguage = createAction({
   schema: settingsSchema,
   revalidate: ["/settings", "/"],
   handler: async (input, { user }: ActionContext) => {
-    await db.update(users).set({ locale: input.locale, updatedAt: new Date() }).where(eq(users.id, user.id));
+    await db
+      .update(users)
+      .set({ locale: input.locale, updatedAt: new Date() })
+      .where(eq(users.id, user.id));
     return { locale: input.locale };
   },
 });
@@ -141,6 +180,10 @@ export const deleteAccount = createAction({
           gender: null,
           birthYear: null,
           areaId: null,
+          profileVisibility: "hidden",
+          showGender: false,
+          showAge: false,
+          areaVisibility: "hidden",
           status: "suspended",
           onboardedAt: null,
           deletedAt: new Date(),

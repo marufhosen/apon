@@ -33,23 +33,31 @@ users ──┬── user_interests ── interests ── activities.category
 
 ### `users`
 
-| Column                                                 | Notes                                                                                                                                         |
-| ------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| `id` (text, PK)                                        | Better Auth id                                                                                                                                |
-| `name`, `email`, `email_verified`, `image`             | core auth. `email` is unique at the database level; `phone_number` is unique when present (PostgreSQL allows multiple NULLs) |
-| `username` (unique, lower-case), `display_username`    | username plugin                                                                                                                               |
-| `phone_number`, `phone_number_verified`                | phone plugin                                                                                                                                  |
-| `gender`, `birth_year`, `area_id`, `bio`, `avatar_url` | profile                                                                                                                                       |
-| `role`                                                 | `member` \| `host` \| `admin` (default `member`)                                                                                              |
-| `locale`                                               | `en` \| `bn` (default `en`)                                                                                                                   |
-| `status`                                               | `active` \| `suspended`                                                                                                                       |
-| `onboarded_at`                                         | non-null unlocks the member panel                                                                                                             |
-| `guidelines_accepted_at`                               | stamped during onboarding                                                                                                                     |
-| `deleted_at`                                           | soft delete                                                                                                                                   |
+| Column                                                             | Notes                                                                                                                            |
+| ------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------- |
+| `id` (text, PK)                                                    | Better Auth id                                                                                                                   |
+| `name`, `email`, `email_verified`, `image`                         | core auth. `email` is unique at the database level; `phone_number` is unique when present (PostgreSQL allows multiple NULLs)     |
+| `username` (unique, lower-case), `display_username`                | username plugin                                                                                                                  |
+| `phone_number`, `phone_number_verified`                            | phone plugin                                                                                                                     |
+| `gender`, `birth_year`, `area_id`, `bio`, `avatar_url`             | profile                                                                                                                          |
+| `profile_visibility`, `show_gender`, `show_age`, `area_visibility` | privacy controls: `profile_visibility` is `members` \| `circles` \| `hidden`, `area_visibility` is `exact` \| `zone` \| `hidden` |
+| `role`                                                             | `member` \| `host` \| `admin` (default `member`)                                                                                 |
+| `locale`                                                           | `en` \| `bn` (default `en`)                                                                                                      |
+| `status`                                                           | `active` \| `suspended`                                                                                                          |
+| `onboarded_at`                                                     | non-null unlocks the member panel                                                                                                |
+| `guidelines_accepted_at`                                           | stamped during onboarding                                                                                                        |
+| `deleted_at`                                                       | soft delete                                                                                                                      |
 
 Indexes: unique `email`, unique `phone_number` (nullable), `area_id`, `status`.
 **`area_id` has no foreign key** — validate it with `assertSelectableLocation`
 before saving.
+
+Privacy defaults are `members` (any signed-in member), `show_gender = true`,
+`show_age = true` and `area_visibility = zone`. `getPublicProfile` enforces
+these at query time: a restricted profile returns only name, avatar, role and
+join date; a hidden gender/age/area is returned as `null`, and zone visibility
+returns the area's zone label rather than its exact name. Blocks return no
+profile at all.
 
 ### `sessions`, `accounts`, `verifications`, `rate_limits`
 
@@ -226,14 +234,14 @@ Rules:
 
 ## Deletion behavior
 
-| Action                           | Effect                                                                                                                                |
-| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| Delete account (`deleteAccount`) | Marks `users.deleted_at`, clears username/display name, cancels RSVPs and hosted activities, leaves circles, deletes sessions and all uploads (public images still referenced by history are retained), and notifies affected attendees. Rows keep their history. |
-| Suspend member (admin)           | `users.status = suspended`, deletes sessions; the proxy signs them out.                                                               |
-| Delete venue (admin)             | Soft delete + `approved = false`; past activities keep the reference.                                                                 |
-| Leave circle                     | `circle_members.status = left`; under 3 active members the circle returns to `forming` while invitations are pending, or is archived/released when nobody is left to answer. |
-| Cancel RSVP                      | `rsvps.status = cancelled`, promotes the next waitlisted member.                                                                      |
-| Replace image                    | Old upload soft-deleted and destroyed when no longer referenced.                                                                      |
+| Action                           | Effect                                                                                                                                                                                                                                                                                           |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Delete account (`deleteAccount`) | Marks `users.deleted_at`, clears username/display name and all profile/privacy fields, cancels RSVPs and hosted activities, leaves circles, deletes sessions and all uploads (public images still referenced by history are retained), and notifies affected attendees. Rows keep their history. |
+| Suspend member (admin)           | `users.status = suspended`, deletes sessions; the proxy signs them out.                                                                                                                                                                                                                          |
+| Delete venue (admin)             | Soft delete + `approved = false`; past activities keep the reference.                                                                                                                                                                                                                            |
+| Leave circle                     | `circle_members.status = left`; under 3 active members the circle returns to `forming` while invitations are pending, or is archived/released when nobody is left to answer.                                                                                                                     |
+| Cancel RSVP                      | `rsvps.status = cancelled`, promotes the next waitlisted member.                                                                                                                                                                                                                                 |
+| Replace image                    | Old upload soft-deleted and destroyed when no longer referenced.                                                                                                                                                                                                                                 |
 
 ## Writing schema changes
 

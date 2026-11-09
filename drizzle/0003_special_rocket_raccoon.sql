@@ -1,0 +1,1 @@
+ALTER TABLE "rate_limits" ALTER COLUMN "id" DROP NOT NULL;

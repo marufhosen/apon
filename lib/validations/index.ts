@@ -106,7 +106,12 @@ export const profileSchema = z.object({
     .or(z.literal("").transform(() => undefined)),
   bio: z.string().trim().max(400).optional().default(""),
   avatarUrl: z.string().trim().max(500).optional().default(""),
-  areaId: z.coerce.number().int().positive().optional().or(z.literal("").transform(() => undefined)),
+  areaId: z.coerce
+    .number()
+    .int()
+    .positive()
+    .optional()
+    .or(z.literal("").transform(() => undefined)),
 });
 
 export const settingsSchema = z.object({
@@ -119,7 +124,13 @@ export const settingsSchema = z.object({
  * into `true`, which would make every preference impossible to switch off.
  */
 const checkboxValue = z
-  .union([z.literal("true"), z.literal("false"), z.literal("on"), z.literal(""), z.boolean()])
+  .union([
+    z.literal("true"),
+    z.literal("false"),
+    z.literal("on"),
+    z.literal(""),
+    z.boolean(),
+  ])
   .transform((v) => v === true || v === "true" || v === "on");
 
 export const notificationPrefsSchema = z.object({
@@ -128,6 +139,18 @@ export const notificationPrefsSchema = z.object({
   emailFeedbackRequests: checkboxValue.optional().default(true),
   emailGeneral: checkboxValue.optional().default(false),
   inAppNotifications: checkboxValue.optional().default(true),
+});
+
+/** Who may see a member's full profile. */
+export const PROFILE_VISIBILITIES = ["members", "circles", "hidden"] as const;
+/** How precisely a member's home area is shown to other people. */
+export const AREA_VISIBILITIES = ["exact", "zone", "hidden"] as const;
+
+export const privacySchema = z.object({
+  profileVisibility: z.enum(PROFILE_VISIBILITIES).default("members"),
+  showGender: checkboxValue.optional().default(true),
+  showAge: checkboxValue.optional().default(true),
+  areaVisibility: z.enum(AREA_VISIBILITIES).default("zone"),
 });
 
 export const deleteAccountSchema = z.object({
@@ -149,7 +172,9 @@ export const activityFormSchema = z
     endTime: z.string().regex(/^\d{2}:\d{2}$/, "Invalid time"),
     capacity: z.coerce.number().int().min(2).max(60),
     costBdt: z.coerce.number().int().min(0).max(100000).default(0),
-    womenOnly: z.union([z.literal("true"), z.literal("on"), z.literal(""), z.boolean()]).transform((v) => v === true || v === "true" || v === "on"),
+    womenOnly: z
+      .union([z.literal("true"), z.literal("on"), z.literal(""), z.boolean()])
+      .transform((v) => v === true || v === "true" || v === "on"),
     imageUrl: z.string().trim().max(500).optional().default(""),
   })
   .refine((v) => v.endTime > v.startTime, {
@@ -170,7 +195,9 @@ export const rsvpSchema = z.object({
 export const checkinSchema = z.object({
   activityId: z.coerce.number().int().positive(),
   userId: z.string().min(1),
-  checkedIn: z.union([z.literal("true"), z.literal("false"), z.boolean()]).transform((v) => v === true || v === "true"),
+  checkedIn: z
+    .union([z.literal("true"), z.literal("false"), z.boolean()])
+    .transform((v) => v === true || v === "true"),
 });
 
 // ---------------------------------------------------------------------------
@@ -178,7 +205,12 @@ export const checkinSchema = z.object({
 // ---------------------------------------------------------------------------
 
 /** Optional upload id from a form ("" / missing → undefined). */
-const optionalId = z.coerce.number().int().positive().optional().or(z.literal("").transform(() => undefined));
+const optionalId = z.coerce
+  .number()
+  .int()
+  .positive()
+  .optional()
+  .or(z.literal("").transform(() => undefined));
 
 export const hostApplicationSchema = z.object({
   motivation: z.string().trim().min(30, "A little more detail, please").max(2000),
@@ -213,9 +245,13 @@ export const circleRequestSchema = z.object({
   reason: z.string().trim().max(500).optional().default(""),
 });
 
-export const leaveCircleSchema = z.object({ circleId: z.coerce.number().int().positive() });
+export const leaveCircleSchema = z.object({
+  circleId: z.coerce.number().int().positive(),
+});
 
-export const circleInviteSchema = z.object({ circleId: z.coerce.number().int().positive() });
+export const circleInviteSchema = z.object({
+  circleId: z.coerce.number().int().positive(),
+});
 
 // ---------------------------------------------------------------------------
 // Safety
@@ -285,8 +321,12 @@ export const venueSchema = z.object({
   mapUrl: z.string().trim().max(300).optional().default(""),
   imageUrl: z.string().trim().max(500).optional().default(""),
   type: z.enum(["cafe", "park", "sports", "coworking", "other"]).default("cafe"),
-  isPublic: z.union([z.literal("true"), z.literal("on"), z.literal(""), z.boolean()]).transform((v) => v === true || v === "true" || v === "on"),
-  approved: z.union([z.literal("true"), z.literal("on"), z.literal(""), z.boolean()]).transform((v) => v === true || v === "true" || v === "on"),
+  isPublic: z
+    .union([z.literal("true"), z.literal("on"), z.literal(""), z.boolean()])
+    .transform((v) => v === true || v === "true" || v === "on"),
+  approved: z
+    .union([z.literal("true"), z.literal("on"), z.literal(""), z.boolean()])
+    .transform((v) => v === true || v === "true" || v === "on"),
 });
 
 export const activityReviewSchema = z.object({
@@ -296,6 +336,7 @@ export const activityReviewSchema = z.object({
 
 export type ActivityFormInput = z.infer<typeof activityFormSchema>;
 export type ProfileInput = z.infer<typeof profileSchema>;
+export type PrivacyInput = z.infer<typeof privacySchema>;
 export type FeedbackInput = z.infer<typeof feedbackSchema>;
 export type ReportInput = z.infer<typeof reportSchema>;
 
@@ -305,7 +346,16 @@ export type ReportInput = z.infer<typeof reportSchema>;
 
 export const locationCreateSchema = z.object({
   parentId: z.coerce.number().int().positive(),
-  level: z.enum(["district", "city_corporation", "upazila", "thana", "ward", "union", "area", "village"]),
+  level: z.enum([
+    "district",
+    "city_corporation",
+    "upazila",
+    "thana",
+    "ward",
+    "union",
+    "area",
+    "village",
+  ]),
   nameEn: z.string().trim().min(2).max(80),
   nameBn: z.string().trim().min(1).max(80),
 });
