@@ -48,4 +48,9 @@ export const RATE_LIMITS = {
   feedback: { max: 10, windowSec: 600 },
   circleRequest: { max: 3, windowSec: 3600 },
   upload: { max: 20, windowSec: 600 },
+  poll: { max: 20, windowSec: 300 },
+  safety: { max: 20, windowSec: 600 },
+  profile: { max: 20, windowSec: 600 },
+  circleMutation: { max: 10, windowSec: 600 },
+  locationSearch: { max: 60, windowSec: 60 },
 } as const;

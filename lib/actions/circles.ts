@@ -98,6 +98,7 @@ export const postCircleMessage = createAction({
  */
 export const votePoll = createAction({
   schema: pollVoteSchema,
+  rateLimit: { key: "poll" },
   revalidate: ["/circles", "/home"],
   handler: async (input, { user }: ActionContext) => {
     const pollRows = await db
@@ -130,15 +131,13 @@ export const votePoll = createAction({
       await tx
         .delete(pollVotes)
         .where(and(eq(pollVotes.pollId, input.pollId), eq(pollVotes.userId, user.id)));
-      await tx
-        .insert(pollVotes)
-        .values(
-          optionIds.map((optionId) => ({
-            pollId: input.pollId,
-            optionId,
-            userId: user.id,
-          })),
-        );
+      await tx.insert(pollVotes).values(
+        optionIds.map((optionId) => ({
+          pollId: input.pollId,
+          optionId,
+          userId: user.id,
+        })),
+      );
     });
 
     return { voted: optionIds.length };
@@ -223,6 +222,7 @@ export const declineCircleInvite = createAction({
 /** Any active member can propose another time poll for the circle. */
 export const createPoll = createAction({
   schema: createPollSchema,
+  rateLimit: { key: "poll" },
   revalidate: (input) => [`/circles/${input.circleId}`],
   handler: async (input, { user }: ActionContext) => {
     await requireMember(input.circleId, user.id);
@@ -247,6 +247,7 @@ export const createPoll = createAction({
 /** Leave a circle. The seat goes back to the matching pool. */
 export const leaveCircle = createAction({
   schema: leaveCircleSchema,
+  rateLimit: { key: "circleMutation" },
   revalidate: (input) => [`/circles/${input.circleId}`, "/circles", "/home"],
   handler: async (input, { user }: ActionContext) => {
     const state = await db.transaction(async (tx) => {

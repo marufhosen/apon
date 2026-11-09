@@ -2,7 +2,6 @@ import "server-only";
 
 import type { ReactElement } from "react";
 import { render } from "@react-email/render";
-import { Resend } from "resend";
 import { emailEnabled, env } from "@/lib/env";
 import { EmailButton, EmailLayout, EmailParagraph, OtpCode } from "@/lib/email/templates";
 import { activityUrl } from "@/lib/email/urls";
@@ -10,53 +9,73 @@ import { activityUrl } from "@/lib/email/urls";
 /**
  * Email delivery.
  *
- * Uses Resend when RESEND_API_KEY is set (with EMAIL_FROM as the sender).
+ * Uses Brevo when BREVO_API_KEY and a registered sender are configured.
  * Without it — development only — messages are printed to the server console
  * so sign-up verification works with zero setup.
  */
-
-let client: Resend | null = null;
-function resend(): Resend {
-  if (!env.RESEND_API_KEY) throw new Error("RESEND_API_KEY is not set");
-  client ??= new Resend(env.RESEND_API_KEY);
-  return client;
-}
 
 export interface SendEmailInput {
   to: string;
   subject: string;
   react: ReactElement;
+  delivery?: "best-effort" | "required";
 }
 
-export async function sendEmail({ to, subject, react }: SendEmailInput): Promise<void> {
+export async function sendEmail({
+  to,
+  subject,
+  react,
+  delivery = "best-effort",
+}: SendEmailInput): Promise<void> {
   if (!emailEnabled) {
     // Development fallback only — production refuses to send auth codes this way.
     if (env.NODE_ENV !== "production")
       console.log(`\n[email:dev] → ${to} | ${subject}\n`);
     return;
   }
+
   try {
+    if (!env.BREVO_API_KEY) throw new Error("BREVO_API_KEY is not set");
+    if (!env.BREVO_SENDER_EMAIL) {
+      throw new Error("BREVO_SENDER_EMAIL is not set");
+    }
     const html = await render(react);
-    const { error } = await resend().emails.send({
-      from: env.EMAIL_FROM,
-      to,
-      subject,
-      html,
+    const response = await fetch("https://api.brevo.com/v3/smtp/email", {
+      method: "POST",
+      headers: {
+        accept: "application/json",
+        "api-key": env.BREVO_API_KEY,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        sender: {
+          email: env.BREVO_SENDER_EMAIL,
+          name: env.BREVO_SENDER_NAME,
+        },
+        to: [{ email: to }],
+        subject,
+        htmlContent: html,
+      }),
+      signal: AbortSignal.timeout(15_000),
     });
-    if (error) {
-      console.warn(`[email:resend:warn] Could not send to ${to}: ${error.message}`);
-      if (env.NODE_ENV !== "development") {
-        throw new Error(`Resend failed: ${error.name} — ${error.message}`);
-      }
+
+    if (!response.ok) {
+      const payload = (await response.json().catch(() => null)) as {
+        code?: string;
+        message?: string;
+      } | null;
+      const detail = payload?.message ?? payload?.code ?? response.statusText;
+      throw new Error(`Brevo failed with HTTP ${response.status}: ${detail}`);
     }
   } catch (err) {
     console.warn(
-      `[email:resend:warn] Error sending to ${to}:`,
+      `[email:brevo:warn] Error sending to ${to}:`,
       err instanceof Error ? err.message : err,
     );
-    if (env.NODE_ENV !== "development") {
+    if (delivery === "required" || env.NODE_ENV !== "development") {
       throw err;
     }
+    return;
   }
 }
 
@@ -69,8 +88,8 @@ const appUrl = () => env.NEXT_PUBLIC_APP_URL.replace(/\/$/, "");
 export type AuthCodePurpose = "email-verification" | "forget-password";
 
 /**
- * Account verification / password-reset code. Sent through the existing Resend
- * integration (`RESEND_API_KEY`, `EMAIL_FROM`); never logged in production.
+ * Account verification / password-reset code. Sent through Brevo's transactional
+ * email API; never logged in production.
  */
 export function sendAuthCodeEmail(input: {
   to: string;
@@ -80,9 +99,7 @@ export function sendAuthCodeEmail(input: {
 }) {
   if (!emailEnabled && env.NODE_ENV === "production") {
     // Never fall back to logging a credential code in production.
-    throw new Error(
-      "RESEND_API_KEY must be set in production to send verification codes",
-    );
+    throw new Error("BREVO_API_KEY must be set in production to send verification codes");
   }
   const bn = input.locale === "bn";
   const verify = input.purpose === "email-verification";
@@ -115,6 +132,7 @@ export function sendAuthCodeEmail(input: {
   return sendEmail({
     to: input.to,
     subject: copy.subject,
+    delivery: "required",
     react: (
       <EmailLayout preview={copy.preview} heading={copy.heading}>
         <EmailParagraph>{copy.body}</EmailParagraph>

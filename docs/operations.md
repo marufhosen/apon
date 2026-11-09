@@ -13,7 +13,7 @@ callbacks and email links.
 | Database     | PostgreSQL reachable via `DATABASE_URL`; run migrations before starting a new build                                |
 | Origin       | `BETTER_AUTH_URL` and `NEXT_PUBLIC_APP_URL` must be the public https origin; `trustedOrigins` uses the latter      |
 | Request body | Server Action limit is 9 MB; the proxy buffers up to 10 MB. Any reverse proxy must allow at least that for uploads |
-| Outbound     | HTTPS to `api.resend.com`, `api.cloudinary.com`, `res.cloudinary.com`, and Twilio if enabled                       |
+| Outbound     | HTTPS to `api.brevo.com`, `api.cloudinary.com`, `res.cloudinary.com`, and Twilio if enabled                        |
 
 The repo contains no Dockerfile, CI workflow or platform config. Deploy it as a
 standard Next.js Node server; do not treat `next export` as supported — auth,
@@ -25,8 +25,9 @@ Production:
 
 - `DATABASE_URL`, `BETTER_AUTH_SECRET` (32+ random chars), `BETTER_AUTH_URL`,
   `NEXT_PUBLIC_APP_URL`
-- `RESEND_API_KEY` + `EMAIL_FROM` — required; without the key verification and
-  reset emails cannot be delivered and production send failures throw
+- `BREVO_API_KEY` + `BREVO_SENDER_EMAIL` — required; without them verification
+  and reset emails cannot be delivered and production startup fails. The sender
+  must be registered and active in Brevo. `BREVO_SENDER_NAME` defaults to `APON`.
 - Cloudinary credentials if uploads are enabled
 - `SMS_PROVIDER=twilio` plus all Twilio credentials — the production runtime
   fails fast without working SMS because RSVP depends on phone verification
@@ -57,7 +58,7 @@ Operational notes:
 
 - Run one matching process at a time. It is not guarded by an advisory lock.
 - Job scripts exit non-zero on failure; alert on the exit code and on empty output.
-- Matching and reminders call Resend inside the job. Email failures are logged and
+- Matching and reminders call Brevo inside the job. Email failures are logged and
   do not fail the run, so check logs if members report missing mail.
 - Emails are best-effort by design; in-app notifications are the source of truth.
 
@@ -116,16 +117,16 @@ venue, circle and upload rows are referenced by history.
 
 There is no third-party monitoring wired in. Useful log prefixes:
 
-| Prefix                               | Source                                                                    |
-| ------------------------------------ | ------------------------------------------------------------------------- |
-| `[action]`                           | Unexpected Server Action failures (the client only sees `errors.generic`) |
-| `[auth]`                             | Account-exists email failures                                             |
-| `[email:dev]`, `[email:resend:warn]` | Email fallback and delivery issues                                        |
-| `[sms:dev]`, `[sms:otp:warn]`        | Console SMS and Twilio failures                                           |
-| `[uploads]`                          | Cloudinary destroy/cleanup failures (best-effort)                         |
-| `[matching]`                         | Invite email failures                                                     |
-| `[reminders]`, `[feedback]`          | Job email failures                                                        |
-| `[notify]`                           | Notification insert failures (never thrown)                               |
+| Prefix                              | Source                                                                    |
+| ----------------------------------- | ------------------------------------------------------------------------- |
+| `[action]`                          | Unexpected Server Action failures (the client only sees `errors.generic`) |
+| `[auth]`                            | Account-exists email failures                                             |
+| `[email:dev]`, `[email:brevo:warn]` | Email fallback and delivery issues                                        |
+| `[sms:dev]`, `[sms:otp:warn]`       | Console SMS and Twilio failures                                           |
+| `[uploads]`                         | Cloudinary destroy/cleanup failures (best-effort)                         |
+| `[matching]`                        | Invite email failures                                                     |
+| `[reminders]`, `[feedback]`         | Job email failures                                                        |
+| `[notify]`                          | Notification insert failures (never thrown)                               |
 
 Metrics that matter to the product are already on **Admin → Metrics**: onboarding
 completion, attendance, repeat attendance, average comfort, median days to a

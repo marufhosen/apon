@@ -22,7 +22,7 @@ import {
  * Better Auth instance — email/username + password authentication.
  *
  *   sign up   POST /sign-up/email          (email, username, password)
- *             → a 6-digit verification code is emailed via Resend
+ *             → a 6-digit verification code is emailed via Brevo
  *   verify    POST /email-otp/verify-email (signs the user in on success)
  *   sign in   POST /sign-in/email | /sign-in/username (verified accounts only)
  *   reset     POST /email-otp/request-password-reset → /email-otp/reset-password
@@ -80,8 +80,12 @@ export const auth = betterAuth({
     revokeSessionsOnPasswordReset: true,
     // Same response for new and existing emails; the owner gets a heads-up.
     onExistingUserSignUp: async ({ user }, request) => {
-      await sendAccountExistsEmail({ to: user.email, locale: localeFrom(request) }).catch((err) =>
-        console.warn("[auth] account-exists email failed:", err instanceof Error ? err.message : err),
+      await sendAccountExistsEmail({ to: user.email, locale: localeFrom(request) }).catch(
+        (err) =>
+          console.warn(
+            "[auth] account-exists email failed:",
+            err instanceof Error ? err.message : err,
+          ),
       );
     },
   },
@@ -94,7 +98,11 @@ export const auth = betterAuth({
   },
 
   // The passwordless flows this app used to offer.
-  disabledPaths: ["/sign-in/email-otp", "/forget-password/email-otp", "/sign-in/phone-number"],
+  disabledPaths: [
+    "/sign-in/email-otp",
+    "/forget-password/email-otp",
+    "/sign-in/phone-number",
+  ],
 
   hooks: {
     before: createAuthMiddleware(async (ctx) => {
@@ -103,20 +111,31 @@ export const auth = betterAuth({
       // Password policy (length + letter + number + not the username/email).
       const field = PASSWORD_FIELDS[ctx.path];
       if (field && typeof body[field] === "string") {
-        const personal = [body.username, body.email].filter((v): v is string => typeof v === "string");
+        const personal = [body.username, body.email].filter(
+          (v): v is string => typeof v === "string",
+        );
         if (!isStrongPassword(body[field] as string, personal)) {
-          throw new APIError("BAD_REQUEST", { code: "WEAK_PASSWORD", message: "Password does not meet the requirements" });
+          throw new APIError("BAD_REQUEST", {
+            code: "WEAK_PASSWORD",
+            message: "Password does not meet the requirements",
+          });
         }
       }
 
       // Email codes are only for verification and password reset — never sign-in.
       if (ctx.path === "/email-otp/send-verification-otp" && body.type === "sign-in") {
-        throw new APIError("BAD_REQUEST", { code: "SIGN_IN_CODE_DISABLED", message: "Code sign-in is disabled" });
+        throw new APIError("BAD_REQUEST", {
+          code: "SIGN_IN_CODE_DISABLED",
+          message: "Code sign-in is disabled",
+        });
       }
 
       // Phone OTP may only attach a number to the signed-in account, not sign in.
       if (ctx.path === "/phone-number/verify" && body.updatePhoneNumber !== true) {
-        throw new APIError("BAD_REQUEST", { code: "PHONE_SIGN_IN_DISABLED", message: "Phone sign-in is disabled" });
+        throw new APIError("BAD_REQUEST", {
+          code: "PHONE_SIGN_IN_DISABLED",
+          message: "Phone sign-in is disabled",
+        });
       }
     }),
   },
@@ -171,7 +190,23 @@ export const auth = betterAuth({
       storeOTP: isProduction ? "hashed" : "plain",
       sendVerificationOTP: async ({ email, otp, type }, ctx) => {
         if (type !== "email-verification" && type !== "forget-password") return;
-        await sendAuthCodeEmail({ to: email, code: otp, locale: localeFrom(ctx?.request), purpose: type });
+        try {
+          await sendAuthCodeEmail({
+            to: email,
+            code: otp,
+            locale: localeFrom(ctx?.request),
+            purpose: type,
+          });
+        } catch (error) {
+          console.error(
+            "[auth] verification email delivery failed",
+            error instanceof Error ? error.message : error,
+          );
+          throw new APIError("INTERNAL_SERVER_ERROR", {
+            code: "EMAIL_DELIVERY_FAILED",
+            message: "Verification email could not be delivered",
+          });
+        }
       },
     }),
 

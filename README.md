@@ -4,7 +4,7 @@
 
 Bilingual (English / বাংলা) app that matches people anywhere in Bangladesh into small weekly circles of 4–6 and gives them hosted, real-world activities to meet at.
 
-Next.js 16 (App Router, `proxy.ts`) · React 19 · Drizzle + PostgreSQL · Better Auth (email/username + password) · Resend · Cloudinary · next-intl · Tailwind v4.
+Next.js 16 (App Router, `proxy.ts`) · React 19 · Drizzle + PostgreSQL · Better Auth (email/username + password) · Brevo · Cloudinary · next-intl · Tailwind v4.
 
 ## Documentation
 
@@ -27,7 +27,7 @@ npm run dev
 ```
 
 Sign in with any seeded email or username (e.g. `admin@apon.app` or `rafi.ahmed`) and the demo password `Apon2026demo`.
-Without `RESEND_API_KEY`, development logs email events and stores verification codes in the `verifications` table (see `docs/development.md`).
+Without `BREVO_API_KEY`, development logs email events and stores verification codes in the `verifications` table (see `docs/development.md`).
 
 ## Authentication
 
@@ -41,8 +41,10 @@ Email/username + password, built on Better Auth (`lib/auth.ts`):
 | Forgot / reset password                     | `/forgot-password` → `/reset-password` | `/email-otp/request-password-reset` → `/email-otp/reset-password` |
 | Change password, sign out other devices     | Settings → Password & security         | `/change-password` · `/revoke-other-sessions`                     |
 
-- Codes are sent through Resend with `RESEND_API_KEY` and `EMAIL_FROM` (server-only).
+- Codes are sent through Brevo with `BREVO_API_KEY`, `BREVO_SENDER_EMAIL`, and
+  `BREVO_SENDER_NAME` (server-only).
   In production a missing key makes sending fail loudly instead of logging the code.
+  The sender email must be registered and active in the Brevo account.
 - Passwords: scrypt hashes (Better Auth). 8–128 characters with a letter and a number,
   and they can't contain the username or email. The same rules run in the forms and in a
   server hook (`lib/validations/auth.ts`).

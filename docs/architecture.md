@@ -14,7 +14,7 @@ process and talk to PostgreSQL through Drizzle.
 | Database        | PostgreSQL + Drizzle ORM (postgres-js driver)                             | `lib/db/`                            |
 | Auth            | Better Auth: email/username + password, email OTP verification, phone OTP | `lib/auth.ts`                        |
 | Validation      | Zod, schemas shared by client and server                                  | `lib/validations/`                   |
-| Email           | Resend + React Email templates                                            | `lib/email/`                         |
+| Email           | Brevo API + React Email templates                                         | `lib/email/`                         |
 | SMS             | Console (default) or Twilio                                               | `lib/sms/`                           |
 | Uploads         | Cloudinary signed uploads                                                 | `lib/uploads/`, `lib/cloudinary.ts`  |
 | Tests           | Vitest (unit), Playwright (E2E)                                           | `tests/`                             |
@@ -39,11 +39,11 @@ process and talk to PostgreSQL through Drizzle.
                     │                                    │
                     └──► lib/actions/* (createAction) ───┘
                               │
-                              ├─ lib/email (Resend) / lib/notify (in-app)
+                              ├─ lib/email (Brevo) / lib/notify (in-app)
                               └─ lib/uploads → Cloudinary
 ```
 
-External services are optional in development: without `RESEND_API_KEY` email
+External services are optional in development: without `BREVO_API_KEY` email
 sending is logged, without Twilio SMS codes are printed, and without full
 Cloudinary credentials uploads are disabled (the UI reports it).
 
@@ -255,8 +255,10 @@ requests. Jobs are idempotent by checking existing `notifications` rows.
 
 Postgres fixed-window counters in the shared `rate_limits` table. Better Auth
 endpoints have their own rules; app mutations use `lib/rate-limit.ts`
-(`rsvp`, `message`, `report`, `feedback`, `circleRequest`, `upload`, `otpRequest`)
-plus the `createAction` rate-limit option.
+(`rsvp`, `message`, `report`, `feedback`, `circleRequest`, `circleMutation`,
+`poll`, `safety`, `profile`, `locationSearch`, `upload`, `otpRequest`) plus the
+`createAction` rate-limit option. Location lookups apply the same database-backed
+limiter directly because they are read-only server functions rather than mutations.
 
 ### Rendering and caching
 

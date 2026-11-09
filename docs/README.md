@@ -28,7 +28,7 @@ Browser ──► proxy.ts ──► route group layout ──► page (Server C
                 └─ next-intl locale routing                                 │   (session, role,
                                                                             │    rate limit, Zod)
                               Cloudinary ◄── uploadFile                     │
-                              Resend     ◄── lib/email                      └─ revalidate
+                              Brevo      ◄── lib/email                      └─ revalidate
                               Twilio     ◄── lib/sms
 ```
 

@@ -13,7 +13,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 APON (repo `bondhu-circle`) is a bilingual (English / বাংলা) web app that matches
 people anywhere in Bangladesh into small weekly circles of 4–6 and gives them
 hosted, real-world activities to meet at. It is a Next.js 16 App Router
-application with PostgreSQL, Better Auth, Drizzle, Cloudinary and Resend.
+application with PostgreSQL, Better Auth, Drizzle, Cloudinary and Brevo.
 
 - **Product and setup:** `README.md`
 - **How the system fits together:** `docs/architecture.md`
@@ -216,7 +216,7 @@ revalidate/tags, handler })` → `ActionError` for user-visible failures → cal
   import time with a readable message. Scripts load `.env` themselves.
 - Better Auth stores OTPs plain in development/test so Playwright can read
   `verifications`; production hashes them. Never log codes in a production path.
-- Without `RESEND_API_KEY`, development only logs the email event; the code is
+- Without `BREVO_API_KEY`, development only logs the email event; the code is
   in the `verifications` table. Production requires the key.
 - Cloudinary needs all three credentials (or `CLOUDINARY_URL`); with only the API
   key, uploads are disabled and the UI says so.

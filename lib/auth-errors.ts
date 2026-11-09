@@ -3,7 +3,9 @@
  * Credential failures are deliberately generic so they don't reveal whether
  * an email or username exists.
  */
-export function authErrorKey(error: { code?: string; status?: number; message?: string } | null | undefined): string {
+export function authErrorKey(
+  error: { code?: string; status?: number; message?: string } | null | undefined,
+): string {
   if (!error) return "generic";
   if (error.status === 429) return "rateLimited";
   switch (error.code) {
@@ -32,6 +34,8 @@ export function authErrorKey(error: { code?: string; status?: number; message?: 
       return "otpInvalid";
     case "TOO_MANY_ATTEMPTS":
       return "tooManyAttempts";
+    case "EMAIL_DELIVERY_FAILED":
+      return "emailDeliveryFailed";
     default:
       return "generic";
   }

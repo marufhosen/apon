@@ -327,6 +327,7 @@
       "otpInvalid": "That code is incorrect or has expired.",
       "tooManyAttempts": "Too many attempts. Request a new code.",
       "rateLimited": "Too many attempts. Please wait a minute and try again.",
+      "emailDeliveryFailed": "We could not send the email. Please try again shortly or contact support.",
       "generic": "Something went wrong. Please try again."
     },
     "security": {

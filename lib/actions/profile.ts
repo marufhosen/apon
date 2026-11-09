@@ -37,6 +37,7 @@ import { reconcileCircle, sendCircleStateNotifications } from "@/lib/circles/lif
 /** Edit public profile fields. */
 export const updateProfile = createAction({
   schema: profileSchema,
+  rateLimit: { key: "profile" },
   revalidate: (_input, user) => [`/profile/${user.id}`, "/settings", "/home"],
   handler: async (input, { user }: ActionContext): Promise<{ id: string }> => {
     if (input.areaId) await assertSelectableLocation(input.areaId);
@@ -73,6 +74,7 @@ export const updateProfile = createAction({
  */
 export const updatePrivacySettings = createAction({
   schema: privacySchema,
+  rateLimit: { key: "profile" },
   revalidate: (_input, user) => [`/profile/${user.id}`, "/settings"],
   handler: async (input, { user }: ActionContext) => {
     const [updated] = await db
@@ -95,6 +97,7 @@ export const updatePrivacySettings = createAction({
 /** Notification preferences (settings page). */
 export const updateNotificationPrefs = createAction({
   schema: notificationPrefsSchema,
+  rateLimit: { key: "profile" },
   revalidate: ["/settings"],
   handler: async (input, { user }: ActionContext) => {
     await db
@@ -111,6 +114,7 @@ export const updateNotificationPrefs = createAction({
 /** Preferred language stored on the user record (URL prefix stays the source of truth for rendering). */
 export const updateLanguage = createAction({
   schema: settingsSchema,
+  rateLimit: { key: "profile" },
   revalidate: ["/settings", "/"],
   handler: async (input, { user }: ActionContext) => {
     await db

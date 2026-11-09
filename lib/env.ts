@@ -3,6 +3,7 @@ import "server-only";
 import { z } from "zod";
 
 import { productionSmsConfigurationError } from "@/lib/sms/config";
+import { productionEmailConfigurationError } from "@/lib/email/config";
 
 // Standalone scripts (`tsx`) don't get Next's .env loading — do it ourselves.
 // `loadEnvFile` never overrides variables already present in the environment.
@@ -38,8 +39,9 @@ const schema = z.object({
   TWILIO_AUTH_TOKEN: z.string().optional(),
   TWILIO_FROM: z.string().optional(),
 
-  RESEND_API_KEY: z.string().optional(),
-  EMAIL_FROM: z.string().default("APON <onboarding@resend.dev>"),
+  BREVO_API_KEY: z.string().trim().optional(),
+  BREVO_SENDER_EMAIL: z.string().email().optional(),
+  BREVO_SENDER_NAME: z.string().trim().min(1).default("APON"),
 
   // Cloudinary (image + file uploads). Server-only — never exposed to the
   // browser. Either the three separate variables or CLOUDINARY_URL
@@ -76,7 +78,7 @@ if (!parsed.success) {
 export const env = parsed.data;
 
 /** True when real email delivery is configured (otherwise we log to console). */
-export const emailEnabled = Boolean(env.RESEND_API_KEY);
+export const emailEnabled = Boolean(env.BREVO_API_KEY);
 
 /** True when real SMS delivery is configured (otherwise we log to console). */
 export const smsEnabled =
@@ -112,6 +114,14 @@ const smsConfigurationError = productionSmsConfigurationError({
   from: env.TWILIO_FROM,
 });
 if (smsConfigurationError) throw new Error(smsConfigurationError);
+
+const emailConfigurationError = productionEmailConfigurationError({
+  nodeEnv: env.NODE_ENV,
+  nextPhase: process.env.NEXT_PHASE,
+  apiKey: env.BREVO_API_KEY,
+  senderEmail: env.BREVO_SENDER_EMAIL,
+});
+if (emailConfigurationError) throw new Error(emailConfigurationError);
 
 if (!uploadsEnabled && env.CLOUDINARY_API_KEY && env.NODE_ENV !== "test") {
   console.warn(

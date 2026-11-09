@@ -7,6 +7,7 @@ import { z } from "zod";
 import { getCurrentUser } from "@/lib/session";
 import { getLocationChildren, searchLocations } from "@/lib/queries/locations";
 import type { LocationOption, LocationSearchResult } from "@/lib/geo/levels";
+import { consumeRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 
 /**
  * Read-only lookups for the client-side location picker. The tree is ~6k
@@ -22,6 +23,11 @@ export async function loadLocationChildren(
 ): Promise<LocationOption[]> {
   const user = await getCurrentUser();
   if (!user) return [];
+  const allowed = await consumeRateLimit(
+    `app:locationSearch:${user.id}`,
+    RATE_LIMITS.locationSearch,
+  );
+  if (!allowed.ok) return [];
   const parsed = parentSchema.safeParse(parentId);
   if (!parsed.success) return [];
   return getLocationChildren(parsed.data);
@@ -30,6 +36,11 @@ export async function loadLocationChildren(
 export async function findLocations(query: string): Promise<LocationSearchResult[]> {
   const user = await getCurrentUser();
   if (!user) return [];
+  const allowed = await consumeRateLimit(
+    `app:locationSearch:${user.id}`,
+    RATE_LIMITS.locationSearch,
+  );
+  if (!allowed.ok) return [];
   const parsed = querySchema.safeParse(query);
   if (!parsed.success) return [];
   return searchLocations(parsed.data, 12);

@@ -4,7 +4,7 @@
 
 - Node.js 20.9+ (Next.js 16 requirement) and npm.
 - PostgreSQL 14+ reachable through `DATABASE_URL`.
-- Optional: Resend, Cloudinary and Twilio accounts. The app runs without them —
+- Optional: Brevo, Cloudinary and Twilio accounts. The app runs without them —
   email is logged, SMS codes print to the console, uploads are disabled.
 
 ## First run
@@ -24,7 +24,11 @@ Sign in with a seeded email or username and the demo password
 `ayesha.1@example.com` (member). The seed prints the generated usernames.
 
 In development, verification and reset codes are stored in the `verifications`
-table (query by email); they are not sent anywhere unless `RESEND_API_KEY` is set.
+table (query by email); they are not sent anywhere unless `BREVO_API_KEY` is set.
+
+Register a sender in Brevo, then set `BREVO_SENDER_EMAIL` to that exact address.
+Every message is sent directly to its intended recipient. Required verification
+and reset sends fail visibly when Brevo rejects delivery.
 
 > `npm run db:seed` truncates every table in the public schema. Only run it
 > against a disposable local database.
@@ -40,8 +44,9 @@ with a readable message.
 | `BETTER_AUTH_SECRET`                                                     | yes        | ≥16 chars; use 32+ random chars                                       |
 | `BETTER_AUTH_URL`                                                        | no         | Default `http://localhost:3000`; must match the served origin         |
 | `NEXT_PUBLIC_APP_URL`                                                    | no         | Default `http://localhost:3000`; trusted origin and email links       |
-| `RESEND_API_KEY`                                                         | production | Empty in dev → email is logged; production throws on send failure     |
-| `EMAIL_FROM`                                                             | no         | Default `APON <onboarding@resend.dev>`                                |
+| `BREVO_API_KEY`                                                          | production | Empty in dev → email is logged; production throws on send failure     |
+| `BREVO_SENDER_EMAIL`                                                     | production | Must be a registered, active sender in Brevo                          |
+| `BREVO_SENDER_NAME`                                                      | no         | Display name; defaults to `APON`                                      |
 | `SMS_PROVIDER`                                                           | production | `console` in dev; production runtime requires `twilio`                |
 | `TWILIO_ACCOUNT_SID` / `TWILIO_AUTH_TOKEN` / `TWILIO_FROM`               | production | All three are required for production SMS OTP delivery                |
 | `CLOUDINARY_CLOUD_NAME` / `CLOUDINARY_API_KEY` / `CLOUDINARY_API_SECRET` | optional   | All three needed; or use `CLOUDINARY_URL`                             |
@@ -245,7 +250,7 @@ upload changes that need the real stack. Report anything you could not run.
 | Every route redirects to `/sign-in`      | No session, or `BETTER_AUTH_URL`/`NEXT_PUBLIC_APP_URL` does not match the origin you opened.               |
 | Signed-in member gets 403 on `/admin`    | Correct behavior. Use an admin account.                                                                    |
 | Uploads disabled in the UI               | Cloudinary needs cloud name + API key + secret (or `CLOUDINARY_URL`).                                      |
-| No verification code                     | In dev, read it from `verifications`; set `RESEND_API_KEY` for real email.                                 |
+| No verification code                     | In dev, read it from `verifications`; configure Brevo for real email.                                      |
 | `server-only` error in a script          | Run with `node --conditions=react-server --import tsx …` like the npm scripts.                             |
 | Migration drift                          | Use `db:generate` + `db:migrate`; avoid mixing `db:push` with migration history on a shared DB.            |
 | E2E cannot read OTPs                     | `DATABASE_URL` missing or the DB is not seeded; tests need the same DB the dev server uses.                |
