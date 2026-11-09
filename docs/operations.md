@@ -141,7 +141,7 @@ circle and members who met the same circle 3+ times.
 4. Required env vars and secrets are set for the target origin.
 5. Deploy the build, then run `npm run db:migrate` if it was not part of the
    release step.
-6. Smoke-test in a browser: `/en`, sign-in, onboarding or `/home`, one activity
+6. Smoke-test in a browser: `/`, sign-in, onboarding or `/home`, one activity
    detail, one RSVP, and (if enabled) one upload.
 7. Confirm the cron entries exist and that the last run produced output.
 8. Roll back by redeploying the previous build; migrations must remain

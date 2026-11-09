@@ -13,7 +13,7 @@ test.afterAll(async () => {
 
 async function signIn(page: Page, identifier: string) {
   await page.context().clearCookies();
-  await page.goto("/en/sign-in");
+  await page.goto("/sign-in");
   await page.getByLabel("Email or username").fill(identifier);
   await page.getByLabel("Password", { exact: true }).fill("Apon2026demo");
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
@@ -26,24 +26,28 @@ test.beforeAll(async () => {
 
 test("admins open circle details from the circles list", async ({ page }) => {
   await signIn(page, "admin@apon.app");
-  await page.goto("/en/admin/circles");
+  await page.goto("/admin/circles");
   await page.getByRole("link", { name: "Open" }).first().click();
-  await expect(page).toHaveURL(/\/en\/admin\/circles\/\d+$/);
+  await expect(page).toHaveURL(/\/admin\/circles\/\d+$/);
   await expect(page.getByRole("heading", { level: 1 })).not.toBeEmpty();
   await expect(page.getByRole("columnheader", { name: "Member" })).toBeVisible();
   await expect(page.getByText("Message contents are private to members.")).toBeVisible();
 });
 
-test("circle details are admin-only and the member page stays private", async ({ page }) => {
-  const [circle] = await sql<{ id: number }[]>`select id from circles order by id limit 1`;
+test("circle details are admin-only and the member page stays private", async ({
+  page,
+}) => {
+  const [circle] = await sql<
+    { id: number }[]
+  >`select id from circles order by id limit 1`;
   await signIn(page, "rafi.ahmed2");
-  expect((await page.goto(`/en/admin/circles/${circle.id}`))?.status()).toBe(403);
+  expect((await page.goto(`/admin/circles/${circle.id}`))?.status()).toBe(403);
 });
 
 test("venue modal fits short screens and scrolls to Save", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 640 });
   await signIn(page, "admin@apon.app");
-  await page.goto("/en/admin/venues");
+  await page.goto("/admin/venues");
   await page.getByRole("button", { name: "Add venue" }).click();
   const dialog = page.getByRole("dialog");
   await expect(dialog).toBeVisible();

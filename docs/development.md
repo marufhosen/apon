@@ -16,7 +16,7 @@ npm install
 npm run db:generate
 npm run db:migrate
 npm run db:seed         # demo users, venues, activities, circles + the location tree
-npm run dev             # http://localhost:3000/en
+npm run dev             # http://localhost:3000
 ```
 
 Sign in with a seeded email or username and the demo password
@@ -237,8 +237,9 @@ upload changes that need the real stack. Report anything you could not run.
   raw colors.
 - **Components:** primitives in `components/ui` (Radix + CVA), feature components
   grouped by domain. Keep pages thin.
-- **Theme:** `bondhu-theme` in localStorage; the pre-paint script lives in
-  `app/[locale]/layout.tsx`.
+- **Theme:** `APON_THEME` is the server-readable preference cookie;
+  `bondhu-theme` localStorage is a migration fallback. The pre-paint script lives
+  in `app/[locale]/layout.tsx`.
 - **Comments:** explain the rule or the race, not the syntax.
 
 ## Troubleshooting

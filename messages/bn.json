@@ -33,6 +33,8 @@
     "admin": "অ্যাডমিন",
     "member": "সদস্য",
     "language": "ভাষা",
+    "switchToLight": "লাইট মোডে যান",
+    "switchToDark": "ডার্ক মোডে যান",
     "signIn": "সাইন ইন",
     "signOut": "সাইন আউট",
     "spotsLeft": "{count, plural, one {#টি জায়গা খালি} other {#টি জায়গা খালি}}",

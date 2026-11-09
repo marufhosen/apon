@@ -111,7 +111,7 @@ export const updateNotificationPrefs = createAction({
   },
 });
 
-/** Preferred language stored on the user record (URL prefix stays the source of truth for rendering). */
+/** Preferred language stored on the user record; the client mirrors it to the locale cookie. */
 export const updateLanguage = createAction({
   schema: settingsSchema,
   rateLimit: { key: "profile" },

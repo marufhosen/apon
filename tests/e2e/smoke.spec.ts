@@ -1,6 +1,12 @@
 import { expect, test } from "@playwright/test";
 
-import { activityAddress, closeDb, findBookableActivityId, readOtp, sql } from "./helpers/db";
+import {
+  activityAddress,
+  closeDb,
+  findBookableActivityId,
+  readOtp,
+  sql,
+} from "./helpers/db";
 
 // Sign-in is rate limited per IP; every test starts from a clean window.
 test.beforeEach(async () => {
@@ -13,18 +19,46 @@ test.afterAll(async () => {
 
 test.describe("public site", () => {
   test("landing page renders in English and Bangla", async ({ page }) => {
-    await page.goto("/en");
-    await expect(page.getByRole("heading", { level: 1 })).toContainText("Find your people");
+    await page
+      .context()
+      .addCookies([{ name: "NEXT_LOCALE", value: "en", url: "http://localhost:3000" }]);
+    await page.goto("/");
+    await expect(page.getByRole("heading", { level: 1 })).toContainText(
+      "Find your people",
+    );
 
-    await page.goto("/bn");
+    await page.getByRole("button", { name: "Language" }).click();
+    await expect(page.locator("html")).toHaveAttribute("lang", "bn");
+    await expect(page).toHaveURL("http://localhost:3000/");
+    await page.reload();
+    await expect(page.locator("html")).toHaveAttribute("lang", "bn");
+  });
+
+  test("dark mode persists without changing the URL", async ({ page }) => {
+    await page
+      .context()
+      .addCookies([{ name: "NEXT_LOCALE", value: "en", url: "http://localhost:3000" }]);
+    await page.goto("/");
+    await page.getByRole("button", { name: "Switch to dark mode" }).click();
+    await expect(page.locator("html")).toHaveClass(/dark/);
+    await expect(page).toHaveURL("http://localhost:3000/");
+    await page.reload();
+    await expect(page.locator("html")).toHaveClass(/dark/);
+  });
+
+  test("old locale-prefixed links migrate to cookie-based URLs", async ({ page }) => {
+    await page.goto("/bn/guidelines");
+    await expect(page).toHaveURL("http://localhost:3000/guidelines");
     await expect(page.locator("html")).toHaveAttribute("lang", "bn");
   });
 
   test("guidelines are readable without an account", async ({ page }) => {
-    await page.goto("/en/guidelines");
-    await expect(page.getByRole("heading", { level: 1 })).toContainText("Community guidelines");
+    await page.goto("/guidelines");
+    await expect(page.getByRole("heading", { level: 1 })).toContainText(
+      "Community guidelines",
+    );
 
-    await page.goto("/en/credits");
+    await page.goto("/credits");
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
   });
 
@@ -41,7 +75,7 @@ test.describe("public site", () => {
   });
 
   test("signed-out members are sent to sign-in", async ({ page }) => {
-    await page.goto("/en/activities");
+    await page.goto("/activities");
     await expect(page).toHaveURL(/\/sign-in/);
   });
 });
@@ -49,13 +83,15 @@ test.describe("public site", () => {
 const PASSWORD = "Circle2026safe";
 
 test.describe("password authentication", () => {
-  test("sign-up requires email verification, then email or username + password sign-in", async ({ page }) => {
+  test("sign-up requires email verification, then email or username + password sign-in", async ({
+    page,
+  }) => {
     const stamp = Date.now();
     const email = `auth.${stamp}@apon.test`;
     const username = `auth_${stamp}`;
 
     // ---------------------------------------------------------------- sign up
-    await page.goto("/en/sign-up");
+    await page.goto("/sign-up");
     await page.getByLabel("Email address").fill(email);
     await page.getByLabel("Username").fill(username);
     await page.getByLabel("Password", { exact: true }).fill("short1");
@@ -71,7 +107,7 @@ test.describe("password authentication", () => {
 
     // ---------------------------------------- unverified accounts can't sign in
     const unverified = await page.context().browser()!.newPage();
-    await unverified.goto("/en/sign-in");
+    await unverified.goto("/sign-in");
     await unverified.getByLabel("Email or username").fill(username);
     await unverified.getByLabel("Password", { exact: true }).fill(PASSWORD);
     await unverified.getByRole("button", { name: "Sign in", exact: true }).click();
@@ -80,7 +116,9 @@ test.describe("password authentication", () => {
 
     // ------------------------------------------------------- verify by code
     await expect
-      .poll(() => readOtp(`email-verification-otp-${email}`).catch(() => ""), { message: "verification code stored" })
+      .poll(() => readOtp(`email-verification-otp-${email}`).catch(() => ""), {
+        message: "verification code stored",
+      })
       .toMatch(/^\d{6}$/);
     const code = await readOtp(`email-verification-otp-${email}`);
     await page.getByLabel("6-digit code").fill(code === "000000" ? "111111" : "000000");
@@ -94,7 +132,7 @@ test.describe("password authentication", () => {
 
     // ----------------------------------------------------- sign out, sign in
     await page.context().clearCookies();
-    await page.goto("/en/sign-in");
+    await page.goto("/sign-in");
     await page.getByLabel("Email or username").fill(username);
     await page.getByLabel("Password", { exact: true }).fill("WrongPass999");
     await page.getByRole("button", { name: "Sign in", exact: true }).click();
@@ -105,18 +143,21 @@ test.describe("password authentication", () => {
     await expect(page).toHaveURL(/\/onboarding/, { timeout: 30_000 });
 
     await page.context().clearCookies();
-    await page.goto("/en/sign-in");
+    await page.goto("/sign-in");
     await page.getByLabel("Email or username").fill(email.toUpperCase());
     await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
     await page.getByRole("button", { name: "Sign in", exact: true }).click();
     await expect(page).toHaveURL(/\/onboarding/, { timeout: 30_000 });
 
     // Signed-in users are kept away from the auth pages.
-    await page.goto("/en/sign-up");
+    await page.goto("/sign-up");
     await expect(page).not.toHaveURL(/sign-up/);
   });
 
-  test("forgot password resets with an emailed code and signs out old sessions", async ({ page, browser }) => {
+  test("forgot password resets with an emailed code and signs out old sessions", async ({
+    page,
+    browser,
+  }) => {
     const email = "nusrat@apon.app";
     const newPassword = `Reset${Date.now()}x`;
     await sql`update accounts set password = (select password from accounts where user_id = 'seed_admin_01')
@@ -129,15 +170,19 @@ test.describe("password authentication", () => {
       headers: { origin: "http://localhost:3000" },
     });
     expect(signedIn.ok()).toBe(true);
-    expect(await (await other.request.get("/api/auth/get-session")).json()).not.toBeNull();
+    expect(
+      await (await other.request.get("/api/auth/get-session")).json(),
+    ).not.toBeNull();
 
-    await page.goto("/en/forgot-password");
+    await page.goto("/forgot-password");
     await page.getByLabel("Email address").fill(email);
     await page.getByRole("button", { name: "Email me a reset code" }).click();
     await expect(page).toHaveURL(/\/reset-password\?email=/);
 
     await expect
-      .poll(() => readOtp(`forget-password-otp-${email}`).catch(() => ""), { message: "reset code stored" })
+      .poll(() => readOtp(`forget-password-otp-${email}`).catch(() => ""), {
+        message: "reset code stored",
+      })
       .toMatch(/^\d{6}$/);
     const code = await readOtp(`forget-password-otp-${email}`);
 
@@ -145,7 +190,9 @@ test.describe("password authentication", () => {
     await page.getByLabel("New password", { exact: true }).fill(newPassword);
     await page.getByLabel("Confirm new password").fill(newPassword);
     await page.getByRole("button", { name: "Save new password" }).click();
-    await expect(page.getByText("Your password has been updated. Sign in with your new password.")).toBeVisible();
+    await expect(
+      page.getByText("Your password has been updated. Sign in with your new password."),
+    ).toBeVisible();
 
     // …is revoked by the reset, and the old password no longer works.
     expect(await (await other.request.get("/api/auth/get-session")).json()).toBeNull();
@@ -171,13 +218,13 @@ test.describe("password authentication", () => {
     // Start from the seeded password even if an earlier run stopped half-way.
     await sql`update accounts set password = (select password from accounts where user_id = 'seed_admin_01')
               where user_id = 'seed_host_03' and provider_id = 'credential'`;
-    await page.goto("/en/sign-in");
+    await page.goto("/sign-in");
     await page.getByLabel("Email or username").fill("sadia@apon.app");
     await page.getByLabel("Password", { exact: true }).fill("Apon2026demo");
     await page.getByRole("button", { name: "Sign in", exact: true }).click();
     await expect(page).toHaveURL(/\/home/, { timeout: 30_000 });
 
-    await page.goto("/en/settings#security");
+    await page.goto("/settings#security");
     await page.getByLabel("Current password").fill("NotMyPassword1");
     await page.getByLabel("New password", { exact: true }).fill(newPassword);
     await page.getByLabel("Confirm new password").fill(newPassword);
@@ -189,7 +236,7 @@ test.describe("password authentication", () => {
     await expect(page.getByText("Password updated.")).toBeVisible();
 
     await page.context().clearCookies();
-    await page.goto("/en/sign-in");
+    await page.goto("/sign-in");
     await page.getByLabel("Email or username").fill("sadia.rahman");
     await page.getByLabel("Password", { exact: true }).fill(newPassword);
     await page.getByRole("button", { name: "Sign in", exact: true }).click();
@@ -216,7 +263,7 @@ test.describe("member journey", () => {
     const phone = `018${String(stamp).slice(-8)}`;
 
     // --------------------------------------------------- sign up + verify
-    await page.goto("/en/sign-up");
+    await page.goto("/sign-up");
     await page.getByLabel("Email address").fill(email);
     await page.getByLabel("Username").fill(`member_${stamp}`);
     await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
@@ -225,17 +272,23 @@ test.describe("member journey", () => {
     await expect(page).toHaveURL(/\/verify/);
 
     await expect
-      .poll(() => readOtp(`email-verification-otp-${email}`).catch(() => ""), { message: "verification code stored" })
+      .poll(() => readOtp(`email-verification-otp-${email}`).catch(() => ""), {
+        message: "verification code stored",
+      })
       .toMatch(/^\d{6}$/);
-    await page.getByLabel("6-digit code").fill(await readOtp(`email-verification-otp-${email}`));
+    await page
+      .getByLabel("6-digit code")
+      .fill(await readOtp(`email-verification-otp-${email}`));
     await page.getByRole("button", { name: "Verify email" }).click();
 
     // ------------------------------------------------------------- onboarding
     await expect(page).toHaveURL(/\/onboarding/, { timeout: 30_000 });
-    await expect(page.getByRole("heading", { level: 1 })).toContainText("Set up your profile");
+    await expect(page.getByRole("heading", { level: 1 })).toContainText(
+      "Set up your profile",
+    );
 
     // Step 1 — interests (3–8).
-    const chips = page.locator('main button[aria-pressed]');
+    const chips = page.locator("main button[aria-pressed]");
     for (let index = 0; index < 3; index += 1) {
       const chip = chips.nth(index);
       // Retry until the click lands after hydration (a cold dev compile can be slow).
@@ -249,13 +302,16 @@ test.describe("member journey", () => {
     // Step 2 — location: search the nationwide tree, then narrow with the cascade.
     await page.getByRole("heading", { name: /Where do you live/ }).waitFor();
     await page.getByPlaceholder(/Search any place/).fill("Gulshan 2");
-    await page.getByRole("option", { name: /Gulshan 2/ }).first().click();
+    await page
+      .getByRole("option", { name: /Gulshan 2/ })
+      .first()
+      .click();
     await expect(page.getByRole("button", { name: "Gulshan 2" })).toBeVisible();
     await page.getByRole("button", { name: "Next", exact: true }).click();
 
     // Step 3 — availability.
     await page.getByRole("heading", { name: /When are you usually free/ }).waitFor();
-    await page.locator('main button[aria-pressed]').first().click();
+    await page.locator("main button[aria-pressed]").first().click();
     await page.getByRole("button", { name: "Next", exact: true }).click();
 
     // Step 4 — preferences + guidelines.
@@ -266,12 +322,14 @@ test.describe("member journey", () => {
     await expect(page.getByText("All set").first()).toBeVisible({ timeout: 30_000 });
 
     // --------------------------------------------------- phone verification
-    await page.goto("/en/settings");
+    await page.goto("/settings");
     await page.getByLabel("Phone number").fill(phone);
     await page.getByRole("button", { name: "Send code" }).click();
 
     await expect
-      .poll(() => readOtp(phone.replace(/^0/, "")).catch(() => ""), { message: "SMS OTP should be stored" })
+      .poll(() => readOtp(phone.replace(/^0/, "")).catch(() => ""), {
+        message: "SMS OTP should be stored",
+      })
       .toMatch(/^\d{6}$/);
     const smsCode = await readOtp(phone.replace(/^0/, ""));
 
@@ -283,7 +341,7 @@ test.describe("member journey", () => {
     const activityId = await findBookableActivityId();
     const address = await activityAddress(activityId);
 
-    await page.goto(`/en/activities/${activityId}`);
+    await page.goto(`/activities/${activityId}`);
 
     // The exact venue stays hidden until the RSVP is confirmed.
     await expect(page.getByText("Address visible after you RSVP")).toBeVisible();
@@ -298,11 +356,11 @@ test.describe("member journey", () => {
 
     // ------------------------------------------------ role-based access
     // Members get a 403 for the Admin Panel and host tools, not a silent redirect.
-    const adminResponse = await page.goto("/en/admin");
+    const adminResponse = await page.goto("/admin");
     expect(adminResponse?.status()).toBe(403);
     await expect(page.getByRole("heading", { name: /don't have access/ })).toBeVisible();
 
-    const hostResponse = await page.goto("/en/host/new");
+    const hostResponse = await page.goto("/host/new");
     expect(hostResponse?.status()).toBe(403);
   });
 });

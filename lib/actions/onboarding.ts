@@ -27,7 +27,9 @@ export const saveInterests = createAction({
       if (input.interestIds.length) {
         await tx
           .insert(userInterests)
-          .values(input.interestIds.map((interestId) => ({ userId: user.id, interestId })));
+          .values(
+            input.interestIds.map((interestId) => ({ userId: user.id, interestId })),
+          );
       }
     });
     return { count: input.interestIds.length };
@@ -59,15 +61,13 @@ export const saveAvailability = createAction({
     await db.transaction(async (tx) => {
       await tx.delete(availability).where(eq(availability.userId, user.id));
       if (unique.size) {
-        await tx
-          .insert(availability)
-          .values(
-            [...unique.values()].map((s) => ({
-              userId: user.id,
-              weekday: s.weekday,
-              slot: s.slot,
-            })),
-          );
+        await tx.insert(availability).values(
+          [...unique.values()].map((s) => ({
+            userId: user.id,
+            weekday: s.weekday,
+            slot: s.slot,
+          })),
+        );
       }
     });
     return { count: unique.size };
@@ -83,7 +83,12 @@ export const completeOnboarding = createAction({
   schema: preferencesStepSchema.and(guidelinesStepSchema),
   handler: async (input, { user }: ActionContext) => {
     const now = new Date();
-    const avatarUrl = await resolveOwnedImage(user.id, input.avatarUrl, "avatar", user.avatarUrl);
+    const avatarUrl = await resolveOwnedImage(
+      user.id,
+      input.avatarUrl,
+      "avatar",
+      user.avatarUrl,
+    );
     await db.transaction(async (tx) => {
       await tx
         .insert(preferences)
@@ -135,11 +140,14 @@ export const acceptGuidelines = createAction({
   revalidate: ["/onboarding"],
 });
 
-/** Persist the chosen language alongside the URL prefix. */
+/** Persist the chosen language alongside the browser's locale cookie. */
 export const saveLocale = createAction({
   schema: z.object({ locale: z.enum(["en", "bn"]) }),
   handler: async (input, { user }: ActionContext) => {
-    await db.update(users).set({ locale: input.locale, updatedAt: new Date() }).where(eq(users.id, user.id));
+    await db
+      .update(users)
+      .set({ locale: input.locale, updatedAt: new Date() })
+      .where(eq(users.id, user.id));
     return { locale: input.locale };
   },
   revalidate: ["/"],

@@ -38,7 +38,7 @@ const ADMINS: readonly Role[] = ["admin"];
 const PUBLIC: RouteRule = { section: "public", roles: [], onboarding: false };
 const AUTH: RouteRule = { section: "auth", roles: [], onboarding: false };
 
-/** Classify a path by its segments *after* the locale (`/en/admin/users` → `["admin","users"]`). */
+/** Classify the visible, locale-neutral path (`/admin/users` → `["admin","users"]`). */
 export function ruleFor(segments: string[]): RouteRule {
   const [head = "", second] = segments;
   switch (head) {
@@ -82,13 +82,11 @@ export interface AccessSubject {
 }
 
 export type AccessDecision =
-  | { kind: "allow" }
-  | { kind: "redirect"; to: string }
-  | { kind: "forbidden" };
+  { kind: "allow" } | { kind: "redirect"; to: string } | { kind: "forbidden" };
 
 /**
- * Decide what happens to a request. `to` paths are locale-less
- * (`/sign-in?next=…`); the caller prefixes the locale.
+ * Decide what happens to a request. `to` paths are locale-neutral and can be
+ * returned directly because next-intl resolves the cookie internally.
  */
 export function decideAccess(
   segments: string[],
@@ -109,7 +107,8 @@ export function decideAccess(
   }
 
   // `/dashboard` is a role-aware landing page (used after sign-in).
-  if (segments[0] === "dashboard") return { kind: "redirect", to: homePathFor(user.role) };
+  if (segments[0] === "dashboard")
+    return { kind: "redirect", to: homePathFor(user.role) };
 
   if (!rule.roles.includes(user.role)) return { kind: "forbidden" };
 

@@ -4,7 +4,6 @@ import { cache } from "react";
 import { headers } from "next/headers";
 import { forbidden, redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
-import { getLocale } from "next-intl/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { users, type User } from "@/lib/db/schema";
@@ -22,7 +21,11 @@ export async function getSession() {
 export const getCurrentUser = cache(async (): Promise<User | null> => {
   const session = await getSession();
   if (!session?.user?.id) return null;
-  const rows = await db.select().from(users).where(eq(users.id, session.user.id)).limit(1);
+  const rows = await db
+    .select()
+    .from(users)
+    .where(eq(users.id, session.user.id))
+    .limit(1);
   return rows[0] ?? null;
 });
 
@@ -39,13 +42,11 @@ function nextPath(pathname?: string) {
 export async function requireUser(nextPathname?: string): Promise<User> {
   const user = await getCurrentUser();
   if (!user) {
-    const locale = await getLocale();
-    redirect(`/${locale}/sign-in${nextPath(nextPathname)}`);
+    redirect(`/sign-in${nextPath(nextPathname)}`);
   }
   if (user.status === "suspended") {
     await auth.api.signOut({ headers: await headers() }).catch(() => undefined);
-    const locale = await getLocale();
-    redirect(`/${locale}/sign-in?error=suspended`);
+    redirect("/sign-in?error=suspended");
   }
   return user;
 }
@@ -81,8 +82,7 @@ export async function requireHost(): Promise<User> {
 export async function requireVerifiedPhone(): Promise<User> {
   const user = await requireUser();
   if (!user.phoneNumberVerified) {
-    const locale = await getLocale();
-    redirect(`/${locale}/onboarding?step=phone`);
+    redirect("/onboarding?step=phone");
   }
   return user;
 }
@@ -91,8 +91,7 @@ export async function requireVerifiedPhone(): Promise<User> {
 export async function requireOnboarded(): Promise<User> {
   const user = await requireUser();
   if (!user.onboardedAt) {
-    const locale = await getLocale();
-    redirect(`/${locale}/onboarding`);
+    redirect("/onboarding");
   }
   return user;
 }

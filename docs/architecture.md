@@ -10,7 +10,7 @@ process and talk to PostgreSQL through Drizzle.
 | --------------- | ------------------------------------------------------------------------- | ------------------------------------ |
 | Framework       | Next.js 16 (App Router, `proxy.ts`)                                       | `app/`, `proxy.ts`, `next.config.ts` |
 | UI              | React 19, Tailwind v4, Radix primitives, framer-motion, sonner            | `components/`                        |
-| Language / i18n | TypeScript strict, next-intl (en, bn, always prefixed)                    | `i18n/`, `messages/`                 |
+| Language / i18n | TypeScript strict, next-intl (en, bn, cookie-selected)                    | `i18n/`, `messages/`                 |
 | Database        | PostgreSQL + Drizzle ORM (postgres-js driver)                             | `lib/db/`                            |
 | Auth            | Better Auth: email/username + password, email OTP verification, phone OTP | `lib/auth.ts`                        |
 | Validation      | Zod, schemas shared by client and server                                  | `lib/validations/`                   |
@@ -26,7 +26,7 @@ process and talk to PostgreSQL through Drizzle.
   Browser ────────────►│ proxy.ts                                 │
                        │  1. /api/auth/* → auth.handler           │
                        │  2. ruleFor + decideAccess (RBAC, 403)   │
-                       │  3. next-intl (locale prefix)            │
+                       │  3. next-intl (cookie locale rewrite)    │
                        └───────────────┬──────────────────────────┘
                                        │
                       ┌────────────────▼─────────────────┐
@@ -49,24 +49,25 @@ Cloudinary credentials uploads are disabled (the UI reports it).
 
 ## Layers
 
-| Layer                      | Responsibility                                                                                   | Must not                                               |
-| -------------------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------ |
-| `proxy.ts`                 | Forward auth API, classify the path, redirect signed-out users, return real 403s, prefix locales | Contain business logic or DB writes                    |
-| `app/**/layout.tsx`        | Authoritative guard (`requireAdmin`, `requirePermission`, …), shell/navigation                   | Fetch data a page should own                           |
-| `app/**/page.tsx`          | Compose a page from queries and components, resolve translations                                 | Write data                                             |
-| `lib/queries/*`            | Read-only Drizzle queries shaped for pages                                                       | Mutate                                                 |
-| `lib/actions/*`            | Mutations through `createAction` (auth, rate limit, Zod, write, revalidate)                      | Return raw errors or leak internals                    |
-| `lib/matching`, `lib/rsvp` | Pure domain rules + one orchestration module                                                     | Import React or HTTP                                   |
-| `lib/db`                   | Schema, relations, client                                                                        | Encode policy                                          |
-| `lib/rbac.ts`              | Section rules, roles and permissions                                                             | Import I/O (it is shared with the proxy, UI and tests) |
+| Layer                      | Responsibility                                                                                    | Must not                                               |
+| -------------------------- | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
+| `proxy.ts`                 | Forward auth API, classify the path, redirect signed-out users, return real 403s, rewrite locales | Contain business logic or DB writes                    |
+| `app/**/layout.tsx`        | Authoritative guard (`requireAdmin`, `requirePermission`, …), shell/navigation                    | Fetch data a page should own                           |
+| `app/**/page.tsx`          | Compose a page from queries and components, resolve translations                                  | Write data                                             |
+| `lib/queries/*`            | Read-only Drizzle queries shaped for pages                                                        | Mutate                                                 |
+| `lib/actions/*`            | Mutations through `createAction` (auth, rate limit, Zod, write, revalidate)                       | Return raw errors or leak internals                    |
+| `lib/matching`, `lib/rsvp` | Pure domain rules + one orchestration module                                                      | Import React or HTTP                                   |
+| `lib/db`                   | Schema, relations, client                                                                         | Encode policy                                          |
+| `lib/rbac.ts`              | Section rules, roles and permissions                                                              | Import I/O (it is shared with the proxy, UI and tests) |
 
 ## Request lifecycle
 
 1. **Proxy** (`proxy.ts`)
    - `/api/auth` and everything below it is handed to `auth.handler(request)`;
      the project ships no API routes.
-   - The locale prefix is split off. Public sections return to next-intl without a
-     session lookup; everything else loads the session and the full `users` row.
+   - Old locale prefixes are redirected to clean URLs and saved in `NEXT_LOCALE`.
+     Public sections return to next-intl without a session lookup; everything else
+     loads the session and the full `users` row.
    - Deleted or suspended accounts are redirected to sign-in and their session
      cookies are cleared.
    - `decideAccess` returns `allow`, `redirect` (sign-in with `?next=`, onboarding,
@@ -98,7 +99,7 @@ Route groups are invisible in the URL.
 | `/host`                                                                  | `(app)`       | any role (it doubles as the "apply to host" page)             |
 | `/host/new`, `/host/:id`, `/host/:id/edit`                               | `(app)`       | host, admin, onboarded                                        |
 | `/admin/**`                                                              | `(admin)`     | admin                                                         |
-| `/en/access-denied`                                                      | `[locale]`    | rendered by the proxy rewrite for 403s                        |
+| `/access-denied`                                                         | `[locale]`    | rendered internally by the proxy rewrite for 403s             |
 | `*`                                                                      | catch-all     | `notFound()`                                                  |
 
 `lib/rbac.ts` maps path segments (after the locale) to a `Section`
@@ -220,12 +221,14 @@ comfort and median days from sign-up to circle.
 
 ### Internationalisation
 
-- `i18n/routing.ts`: locales `en` / `bn`, default `en`, `localePrefix: "always"`.
+- `i18n/routing.ts`: locales `en` / `bn`, default `en`, `localePrefix: "never"`.
 - `i18n/request.ts` statically imports both catalogs (no computed import path).
 - `i18n/navigation.ts` exports locale-aware `Link`, `redirect`, `usePathname`,
   `useRouter`, `getPathname`.
 - Server code uses `getTranslations`, client code `useTranslations`.
-- The `NEXT_LOCALE` cookie also selects the language of auth emails.
+- The year-long `NEXT_LOCALE` cookie selects page language and auth-email language.
+- `APON_THEME` renders light/dark mode on the server; `bondhu-theme` localStorage
+  is retained only to migrate existing browser preferences.
 - `messages/*.json` has 21 namespaces; both files must stay structurally in sync.
 
 ### Uploads

@@ -31,7 +31,7 @@ not switch package managers or commit them.
 
 | Task                     | Command                                                     |
 | ------------------------ | ----------------------------------------------------------- |
-| Dev server               | `npm run dev` → http://localhost:3000/en                    |
+| Dev server               | `npm run dev` → http://localhost:3000                       |
 | Typecheck                | `npm run typecheck` (`tsc --noEmit`)                        |
 | Lint                     | `npm run lint` (ESLint 9 flat config)                       |
 | Format                   | `npm run format` (Prettier + Tailwind plugin)               |
@@ -56,7 +56,7 @@ scripts.
 ```
 app/
   layout.tsx                     pass-through root
-  page.tsx                      → /en
+  proxy.ts rewrites `/` internally to app/[locale]
   [locale]/layout.tsx           <html>/<body>, fonts, next-intl, Toaster, UploadsProvider
   [locale]/(marketing)/         /, /guidelines, /credits — public
   [locale]/(auth)/              /sign-in, /sign-up, /verify, /forgot-password, /reset-password
@@ -81,7 +81,7 @@ lib/
   jobs/                         reminders + feedback jobs
   email/, sms/, cloudinary.ts   outbound integrations
   auth.ts, auth-client.ts, session.ts, rbac.ts, env.ts, rate-limit.ts, notify.ts
-i18n/                           routing (en/bn, always prefixed) + navigation helpers
+i18n/                           routing (en/bn, cookie-selected) + navigation helpers
 messages/{en,bn}.json           translation catalogs (21 namespaces, keep in sync)
 proxy.ts                        Next 16 proxy: /api/auth forwarding, RBAC, next-intl
 drizzle/                        generated SQL migrations (gitignored in this checkout)
@@ -124,7 +124,7 @@ tests/e2e/                      Playwright (seeded DB, real OTPs)
    `messages/en.json` and `messages/bn.json` under an existing namespace. Error
    keys returned by actions are translation keys, not sentences. Use `Link` /
    `redirect` / `usePathname` / `useRouter` from `@/i18n/navigation`, never
-   `next/link` or `next/navigation`, so the `/en` or `/bn` prefix survives.
+   `next/link` or `next/navigation`, so cookie-selected locale routing survives.
 
 7. **Database changes are schema-first.** Edit `lib/db/schema.ts`, run
    `npm run db:generate`, inspect the SQL, then `npm run db:migrate`. Do not
@@ -162,8 +162,8 @@ tests/e2e/                      Playwright (seeded DB, real OTPs)
   and form values — do not call `toLocaleString` directly.
 - **UI:** compose `components/ui` primitives, keep forms in
   `components/features/<domain>`, use `sonner` toasts for action errors, and
-  honour the teal `#0f766e` / amber `#fbbf24` palette and the
-  `bondhu-theme` localStorage key.
+  honour the teal `#0f766e` / amber `#fbbf24` palette and the `APON_THEME`
+  preference cookie (`bondhu-theme` localStorage exists only for migration).
 - **Comments** explain _why_ (a rule, a race, a security decision), not _what_.
 
 ## Verification before you finish
@@ -206,8 +206,8 @@ revalidate/tags, handler })` → `ActionError` for user-visible failures → cal
 
 - `proxy.ts` is the Next 16 middleware. There is no `middleware.ts`, and the
   matcher deliberately skips files and `_next` assets but keeps `/api/auth`.
-- Every URL is locale-prefixed (`localePrefix: "always"`). `/` redirects to `/en`;
-  `app/[locale]/layout.tsx` owns `<html>`/`<body>`.
+- Public URLs are locale-neutral (`localePrefix: "never"`). `NEXT_LOCALE` selects
+  the internal rewrite to `app/[locale]`, whose layout owns `<html>`/`<body>`.
 - `cacheComponents` is off: pages render dynamically and read live data. Do not
   add `use cache` or `force-static` without checking the whole route.
 - `forbidden()` works because `experimental.authInterrupts` is on; members hitting

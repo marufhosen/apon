@@ -45,8 +45,11 @@ export async function generateMetadata(): Promise<Metadata> {
   return {
     title: t("hero.title"),
     description: t("hero.subtitle"),
-    alternates: { languages: { en: "/en", bn: "/bn" } },
-    openGraph: { title: `APON — ${t("hero.title")}`, description: t("hero.subtitle"), images: [images.hero.src] },
+    openGraph: {
+      title: `APON — ${t("hero.title")}`,
+      description: t("hero.subtitle"),
+      images: [images.hero.src],
+    },
   };
 }
 
@@ -71,10 +74,18 @@ function SectionHeading({
   return (
     <FadeUp className={cn("max-w-2xl", align === "center" && "mx-auto text-center")}>
       {eyebrow ? (
-        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-primary">{eyebrow}</p>
+        <p className="text-primary text-xs font-semibold tracking-[0.14em] uppercase">
+          {eyebrow}
+        </p>
       ) : null}
-      <h2 className="mt-1.5 text-balance text-xl font-semibold tracking-tight sm:text-2xl lg:text-[1.75rem]">{title}</h2>
-      {subtitle ? <p className="mt-2 text-pretty text-sm text-muted-foreground sm:text-[15px]">{subtitle}</p> : null}
+      <h2 className="mt-1.5 text-xl font-semibold tracking-tight text-balance sm:text-2xl lg:text-[1.75rem]">
+        {title}
+      </h2>
+      {subtitle ? (
+        <p className="text-muted-foreground mt-2 text-sm text-pretty sm:text-[15px]">
+          {subtitle}
+        </p>
+      ) : null}
     </FadeUp>
   );
 }
@@ -88,7 +99,8 @@ export default async function LandingPage() {
     getDivisionCoverage(),
     listActivities({ page: 1 }),
   ]);
-  const name = (row: { nameEn: string; nameBn: string }) => (locale === "bn" ? row.nameBn : row.nameEn);
+  const name = (row: { nameEn: string; nameBn: string }) =>
+    locale === "bn" ? row.nameBn : row.nameEn;
 
   const steps = [
     { icon: Sparkles, key: "step1", image: images.howItWorks.share },
@@ -147,21 +159,21 @@ export default async function LandingPage() {
       <section className="relative overflow-hidden">
         <div
           aria-hidden
-          className="pointer-events-none absolute -top-40 right-[-10%] size-[640px] rounded-full bg-primary/10 blur-3xl"
+          className="bg-primary/10 pointer-events-none absolute -top-40 right-[-10%] size-[640px] rounded-full blur-3xl"
         />
         <div
           aria-hidden
           className="pointer-events-none absolute -bottom-48 left-[-15%] size-[520px] rounded-full bg-amber-300/15 blur-3xl"
         />
-        <div className="relative mx-auto grid w-full max-w-6xl items-center gap-12 px-4 pb-10 pt-8 sm:px-6 lg:grid-cols-[1.05fr_1fr] lg:gap-12 lg:pb-14 lg:pt-12">
+        <div className="relative mx-auto grid w-full max-w-6xl items-center gap-12 px-4 pt-8 pb-10 sm:px-6 lg:grid-cols-[1.05fr_1fr] lg:gap-12 lg:pt-12 lg:pb-14">
           <FadeUp>
-            <p className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-3 py-1 text-xs font-medium text-primary">
+            <p className="border-primary/20 bg-primary/5 text-primary inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium">
               <LogoMark className="size-4" />
               {t("hero.badge")}
             </p>
-            <h1 className="mt-4 text-balance text-[2rem] font-semibold leading-[1.1] tracking-tight sm:text-[2.6rem] lg:text-[3rem]">
+            <h1 className="mt-4 text-[2rem] leading-[1.1] font-semibold tracking-tight text-balance sm:text-[2.6rem] lg:text-[3rem]">
               {t("hero.titleBefore")}
-              <span className="relative whitespace-nowrap text-primary">
+              <span className="text-primary relative whitespace-nowrap">
                 {t("hero.highlight")}
                 <svg
                   aria-hidden
@@ -169,12 +181,18 @@ export default async function LandingPage() {
                   className="absolute -bottom-2 left-0 h-3 w-full text-amber-400"
                   preserveAspectRatio="none"
                 >
-                  <path d="M2 9c60-6 160-8 296-3" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" />
+                  <path
+                    d="M2 9c60-6 160-8 296-3"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                    strokeLinecap="round"
+                  />
                 </svg>
               </span>
               {t("hero.titleAfter")}
             </h1>
-            <p className="mt-4 max-w-xl text-pretty text-[15px] leading-relaxed text-muted-foreground sm:text-base">
+            <p className="text-muted-foreground mt-4 max-w-xl text-[15px] leading-relaxed text-pretty sm:text-base">
               {t("hero.subtitle")}
             </p>
 
@@ -184,20 +202,25 @@ export default async function LandingPage() {
                   {t("hero.ctaPrimary")} <ArrowRight aria-hidden />
                 </Link>
               </Button>
-              <Button size="lg" variant="outline" asChild className="h-11 px-5 text-[15px]">
+              <Button
+                size="lg"
+                variant="outline"
+                asChild
+                className="h-11 px-5 text-[15px]"
+              >
                 <Link href="/#how">{t("hero.ctaSecondary")}</Link>
               </Button>
             </div>
-            <p className="mt-3 text-xs text-muted-foreground">{t("hero.note")}</p>
+            <p className="text-muted-foreground mt-3 text-xs">{t("hero.note")}</p>
 
-            <ul className="mt-6 grid max-w-lg grid-cols-3 gap-3 border-t border-border pt-4 text-sm">
+            <ul className="border-border mt-6 grid max-w-lg grid-cols-3 gap-3 border-t pt-4 text-sm">
               {[
                 { icon: Users, text: t("hero.stat1") },
                 { icon: CalendarHeart, text: t("hero.stat2") },
                 { icon: MapPin, text: t("hero.stat3") },
               ].map((s) => (
-                <li key={s.text} className="flex flex-col gap-1.5 text-muted-foreground">
-                  <s.icon className="size-4 text-primary" aria-hidden />
+                <li key={s.text} className="text-muted-foreground flex flex-col gap-1.5">
+                  <s.icon className="text-primary size-4" aria-hidden />
                   <span className="leading-snug">{s.text}</span>
                 </li>
               ))}
@@ -206,7 +229,7 @@ export default async function LandingPage() {
 
           {/* Visual: photo + floating product cards */}
           <FadeUp delay={0.12} className="relative mx-auto w-full max-w-lg lg:max-w-none">
-            <div className="relative aspect-[4/3] overflow-hidden rounded-3xl border border-border bg-gradient-to-br from-primary/30 via-primary/10 to-amber-100 shadow-xl shadow-primary/10">
+            <div className="border-border from-primary/30 via-primary/10 shadow-primary/10 relative aspect-[4/3] overflow-hidden rounded-3xl border bg-gradient-to-br to-amber-100 shadow-xl">
               <Image
                 src={images.hero.src}
                 alt={t("hero.imageAlt")}
@@ -219,60 +242,77 @@ export default async function LandingPage() {
               />
             </div>
 
-            <div className="absolute -left-3 top-8 w-64 rounded-2xl border border-border bg-card/95 p-3 shadow-lg backdrop-blur sm:-left-8">
-              <p className="flex items-center gap-1.5 text-xs font-semibold text-success">
+            <div className="border-border bg-card/95 absolute top-8 -left-3 w-64 rounded-2xl border p-3 shadow-lg backdrop-blur sm:-left-8">
+              <p className="text-success flex items-center gap-1.5 text-xs font-semibold">
                 <Check className="size-3.5" aria-hidden /> {t("hero.cardCircle")}
               </p>
               <div className="mt-2 flex items-center gap-2">
                 <div className="flex -space-x-2">
                   {["#0f766e", "#f59e0b", "#0369a1", "#be185d", "#4d7c0f"].map((c) => (
-                    <span key={c} className="size-6 rounded-full border-2 border-card" style={{ background: c }} />
+                    <span
+                      key={c}
+                      className="border-card size-6 rounded-full border-2"
+                      style={{ background: c }}
+                    />
                   ))}
                 </div>
-                <span className="text-xs text-muted-foreground">{t("hero.cardCircleText")}</span>
+                <span className="text-muted-foreground text-xs">
+                  {t("hero.cardCircleText")}
+                </span>
               </div>
             </div>
 
-            <div className="absolute -right-2 bottom-24 w-56 rounded-2xl border border-border bg-card/95 p-3 shadow-lg backdrop-blur sm:-right-6">
+            <div className="border-border bg-card/95 absolute -right-2 bottom-24 w-56 rounded-2xl border p-3 shadow-lg backdrop-blur sm:-right-6">
               <p className="flex items-center gap-1.5 text-xs font-semibold">
-                <CalendarCheck className="size-3.5 text-primary" aria-hidden /> {t("hero.cardMeetup")}
+                <CalendarCheck className="text-primary size-3.5" aria-hidden />{" "}
+                {t("hero.cardMeetup")}
               </p>
-              <p className="mt-1 text-xs text-muted-foreground">{t("hero.cardMeetupText")}</p>
+              <p className="text-muted-foreground mt-1 text-xs">
+                {t("hero.cardMeetupText")}
+              </p>
             </div>
 
-            <div className="absolute -bottom-5 left-6 flex items-center gap-3 rounded-2xl border border-border bg-card/95 px-3 py-2.5 shadow-lg backdrop-blur">
-              <span className="grid size-8 place-items-center rounded-lg bg-primary/10 text-primary">
+            <div className="border-border bg-card/95 absolute -bottom-5 left-6 flex items-center gap-3 rounded-2xl border px-3 py-2.5 shadow-lg backdrop-blur">
+              <span className="bg-primary/10 text-primary grid size-8 place-items-center rounded-lg">
                 <Vote className="size-4" aria-hidden />
               </span>
               <div>
                 <p className="text-xs font-semibold">{t("hero.cardPoll")}</p>
                 <div className="mt-1 flex items-center gap-2">
-                  <span className="h-1.5 w-24 overflow-hidden rounded-full bg-muted">
-                    <span className="block h-full w-4/5 rounded-full bg-primary" />
+                  <span className="bg-muted h-1.5 w-24 overflow-hidden rounded-full">
+                    <span className="bg-primary block h-full w-4/5 rounded-full" />
                   </span>
-                  <span className="text-[11px] text-muted-foreground">{t("hero.cardPollText")}</span>
+                  <span className="text-muted-foreground text-[11px]">
+                    {t("hero.cardPollText")}
+                  </span>
                 </div>
               </div>
             </div>
 
-            <div className="absolute -top-4 right-6 inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-medium shadow-md">
-              <BadgeCheck className="size-3.5 text-primary" aria-hidden /> {t("hero.cardVerified")}
+            <div className="border-border bg-card absolute -top-4 right-6 inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium shadow-md">
+              <BadgeCheck className="text-primary size-3.5" aria-hidden />{" "}
+              {t("hero.cardVerified")}
             </div>
           </FadeUp>
         </div>
       </section>
 
       {/* -------------------------------------------------------- Live stats */}
-      <section aria-label={t("stats.title")} className="border-y border-border bg-card">
-        <div className="mx-auto grid w-full max-w-6xl grid-cols-2 divide-border px-4 sm:px-6 lg:grid-cols-4 lg:divide-x">
+      <section aria-label={t("stats.title")} className="border-border bg-card border-y">
+        <div className="divide-border mx-auto grid w-full max-w-6xl grid-cols-2 px-4 sm:px-6 lg:grid-cols-4 lg:divide-x">
           {statTiles.map((s) => (
-            <div key={s.label} className="flex items-center gap-3 px-2 py-4 lg:justify-center lg:px-6">
-              <span className="grid size-10 place-items-center rounded-xl bg-primary/10 text-primary">
+            <div
+              key={s.label}
+              className="flex items-center gap-3 px-2 py-4 lg:justify-center lg:px-6"
+            >
+              <span className="bg-primary/10 text-primary grid size-10 place-items-center rounded-xl">
                 <s.icon className="size-5" aria-hidden />
               </span>
               <div>
-                <p className="tabular text-2xl font-semibold leading-none">{num(s.value, locale)}</p>
-                <p className="mt-1 text-xs text-muted-foreground">{s.label}</p>
+                <p className="tabular text-2xl leading-none font-semibold">
+                  {num(s.value, locale)}
+                </p>
+                <p className="text-muted-foreground mt-1 text-xs">{s.label}</p>
               </div>
             </div>
           ))}
@@ -283,15 +323,24 @@ export default async function LandingPage() {
       {/* -------------------------------------------------------------- Why */}
       <section className="py-10 sm:py-14">
         <div className="mx-auto w-full max-w-6xl px-4 sm:px-6">
-          <SectionHeading eyebrow={t("why.eyebrow")} title={t("why.title")} subtitle={t("why.subtitle")} />
+          <SectionHeading
+            eyebrow={t("why.eyebrow")}
+            title={t("why.title")}
+            subtitle={t("why.subtitle")}
+          />
           <Stagger className="mt-6 grid gap-3 sm:grid-cols-3">
             {why.map((card) => (
-              <StaggerItem key={card.key} className="rounded-2xl border border-border bg-card p-5 shadow-xs">
+              <StaggerItem
+                key={card.key}
+                className="border-border bg-card rounded-2xl border p-5 shadow-xs"
+              >
                 <span className="grid size-10 place-items-center rounded-xl bg-amber-100 text-amber-700 dark:bg-amber-400/15 dark:text-amber-300">
                   <card.icon className="size-5" aria-hidden />
                 </span>
                 <h3 className="mt-3 font-semibold">{t(`why.${card.key}Title`)}</h3>
-                <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">{t(`why.${card.key}Text`)}</p>
+                <p className="text-muted-foreground mt-1.5 text-sm leading-relaxed">
+                  {t(`why.${card.key}Text`)}
+                </p>
               </StaggerItem>
             ))}
           </Stagger>
@@ -299,13 +348,19 @@ export default async function LandingPage() {
       </section>
 
       {/* ------------------------------------------------------- How it works */}
-      <section id="how" className="scroll-mt-20 border-t border-border bg-card/60 py-10 sm:py-14">
+      <section
+        id="how"
+        className="border-border bg-card/60 scroll-mt-20 border-t py-10 sm:py-14"
+      >
         <div className="mx-auto w-full max-w-6xl px-4 sm:px-6">
           <SectionHeading title={t("how.title")} subtitle={t("how.subtitle")} />
           <Stagger className="mt-6 grid gap-4 md:grid-cols-3">
             {steps.map((step, i) => (
-              <StaggerItem key={step.key} className="group overflow-hidden rounded-2xl border border-border bg-background shadow-xs">
-                <div className="relative aspect-[2/1] overflow-hidden bg-gradient-to-br from-primary/25 to-muted">
+              <StaggerItem
+                key={step.key}
+                className="group border-border bg-background overflow-hidden rounded-2xl border shadow-xs"
+              >
+                <div className="from-primary/25 to-muted relative aspect-[2/1] overflow-hidden bg-gradient-to-br">
                   <Image
                     src={step.image.src}
                     alt={step.image.alt}
@@ -315,38 +370,51 @@ export default async function LandingPage() {
                     sizes="(max-width: 768px) 100vw, 33vw"
                     className="object-cover transition-transform duration-500 group-hover:scale-[1.03]"
                   />
-                  <span className="absolute left-3 top-3 grid size-9 place-items-center rounded-full bg-primary text-sm font-bold text-primary-foreground shadow">
+                  <span className="bg-primary text-primary-foreground absolute top-3 left-3 grid size-9 place-items-center rounded-full text-sm font-bold shadow">
                     {num(i + 1, locale)}
                   </span>
-                  <span className="absolute bottom-3 right-3 rounded-full bg-card/95 px-2.5 py-1 text-[11px] font-medium shadow-sm">
+                  <span className="bg-card/95 absolute right-3 bottom-3 rounded-full px-2.5 py-1 text-[11px] font-medium shadow-sm">
                     {t(`how.${step.key}Time`)}
                   </span>
                 </div>
                 <div className="p-4">
                   <h3 className="flex items-center gap-2 font-semibold">
-                    <step.icon className="size-4 text-primary" aria-hidden />
+                    <step.icon className="text-primary size-4" aria-hidden />
                     {t(`how.${step.key}Title`)}
                   </h3>
-                  <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">{t(`how.${step.key}Text`)}</p>
+                  <p className="text-muted-foreground mt-1.5 text-sm leading-relaxed">
+                    {t(`how.${step.key}Text`)}
+                  </p>
                 </div>
               </StaggerItem>
             ))}
           </Stagger>
 
           {/* A week in your circle */}
-          <div className="mt-8 rounded-2xl border border-border bg-background p-5 shadow-xs sm:p-7">
-            <SectionHeading title={t("week.title")} subtitle={t("week.subtitle")} align="left" />
+          <div className="border-border bg-background mt-8 rounded-2xl border p-5 shadow-xs sm:p-7">
+            <SectionHeading
+              title={t("week.title")}
+              subtitle={t("week.subtitle")}
+              align="left"
+            />
             <ol className="relative mt-6 grid gap-5 md:grid-cols-4">
-              <span aria-hidden className="absolute left-5 top-5 hidden h-0.5 w-[calc(100%-2.5rem)] bg-gradient-to-r from-primary via-primary/50 to-amber-400 md:block" />
+              <span
+                aria-hidden
+                className="from-primary via-primary/50 absolute top-5 left-5 hidden h-0.5 w-[calc(100%-2.5rem)] bg-gradient-to-r to-amber-400 md:block"
+              />
               {week.map((day) => (
                 <li key={day.key} className="relative flex gap-4 md:flex-col md:gap-3">
-                  <span className="relative grid size-10 shrink-0 place-items-center rounded-full border-2 border-primary bg-background text-primary">
+                  <span className="border-primary bg-background text-primary relative grid size-10 shrink-0 place-items-center rounded-full border-2">
                     <day.icon className="size-4" aria-hidden />
                   </span>
                   <div>
-                    <p className="text-[11px] font-semibold uppercase tracking-wider text-primary">{t(`week.${day.key}`)}</p>
+                    <p className="text-primary text-[11px] font-semibold tracking-wider uppercase">
+                      {t(`week.${day.key}`)}
+                    </p>
                     <p className="mt-0.5 font-semibold">{t(`week.${day.key}Title`)}</p>
-                    <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{t(`week.${day.key}Text`)}</p>
+                    <p className="text-muted-foreground mt-1 text-sm leading-relaxed">
+                      {t(`week.${day.key}Text`)}
+                    </p>
                   </div>
                 </li>
               ))}
@@ -361,13 +429,18 @@ export default async function LandingPage() {
           <SectionHeading title={t("features.title")} subtitle={t("features.subtitle")} />
           <Stagger className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {features.map((f) => (
-              <StaggerItem key={f.key} className="flex gap-4 rounded-2xl border border-border bg-card p-5 shadow-xs transition-colors hover:border-primary/40">
-                <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
+              <StaggerItem
+                key={f.key}
+                className="border-border bg-card hover:border-primary/40 flex gap-4 rounded-2xl border p-5 shadow-xs transition-colors"
+              >
+                <span className="bg-primary/10 text-primary grid size-10 shrink-0 place-items-center rounded-xl">
                   <f.icon className="size-5" aria-hidden />
                 </span>
                 <div>
                   <h3 className="font-semibold">{t(`features.${f.key}Title`)}</h3>
-                  <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{t(`features.${f.key}Text`)}</p>
+                  <p className="text-muted-foreground mt-1 text-sm leading-relaxed">
+                    {t(`features.${f.key}Text`)}
+                  </p>
                 </div>
               </StaggerItem>
             ))}
@@ -376,10 +449,17 @@ export default async function LandingPage() {
       </section>
 
       {/* ------------------------------------------- Activities + categories */}
-      <section id="categories" className="scroll-mt-20 border-t border-border bg-card/60 py-10 sm:py-14">
+      <section
+        id="categories"
+        className="border-border bg-card/60 scroll-mt-20 border-t py-10 sm:py-14"
+      >
         <div className="mx-auto w-full max-w-6xl px-4 sm:px-6">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-            <SectionHeading title={t("activities.title")} subtitle={t("activities.subtitle")} align="left" />
+            <SectionHeading
+              title={t("activities.title")}
+              subtitle={t("activities.subtitle")}
+              align="left"
+            />
             <Button asChild variant="outline" className="shrink-0">
               <Link href="/activities">
                 {t("activities.browse")} <ArrowRight aria-hidden />
@@ -396,7 +476,8 @@ export default async function LandingPage() {
                       locale === "bn"
                         ? {
                             ...activity,
-                            categoryName: activity.categoryNameBn ?? activity.categoryName,
+                            categoryName:
+                              activity.categoryNameBn ?? activity.categoryName,
                             areaName: activity.areaNameBn ?? activity.areaName,
                           }
                         : activity
@@ -407,20 +488,23 @@ export default async function LandingPage() {
               ))}
             </Stagger>
           ) : (
-            <p className="mt-6 rounded-2xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
+            <p className="border-border text-muted-foreground mt-6 rounded-2xl border border-dashed p-6 text-center text-sm">
               {t("activities.empty")}
             </p>
           )}
 
           <div className="mt-10">
-            <SectionHeading title={t("categories.title")} subtitle={t("categories.subtitle")} />
+            <SectionHeading
+              title={t("categories.title")}
+              subtitle={t("categories.subtitle")}
+            />
             <Stagger className="mt-5 flex flex-wrap justify-center gap-2">
               {interests.map((interest) => {
                 const Icon = interestIcon(interest.icon);
                 return (
                   <StaggerItem key={interest.id}>
-                    <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-sm font-medium shadow-xs transition-colors hover:border-primary/40 hover:bg-accent">
-                      <Icon className="size-4 text-primary" aria-hidden />
+                    <span className="border-border bg-background hover:border-primary/40 hover:bg-accent inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium shadow-xs transition-colors">
+                      <Icon className="text-primary size-4" aria-hidden />
                       {name(interest)}
                     </span>
                   </StaggerItem>
@@ -435,19 +519,30 @@ export default async function LandingPage() {
       <section className="py-10 sm:py-14">
         <div className="mx-auto grid w-full max-w-6xl items-center gap-6 px-4 sm:px-6 lg:grid-cols-[1fr_1.2fr] lg:gap-10">
           <div>
-            <SectionHeading title={t("coverage.title")} subtitle={t("coverage.subtitle")} align="left" />
-            <p className="mt-4 flex items-start gap-2 text-sm text-muted-foreground">
-              <Building2 className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
+            <SectionHeading
+              title={t("coverage.title")}
+              subtitle={t("coverage.subtitle")}
+              align="left"
+            />
+            <p className="text-muted-foreground mt-4 flex items-start gap-2 text-sm">
+              <Building2 className="text-primary mt-0.5 size-4 shrink-0" aria-hidden />
               {t("coverage.footnote", { places: num(stats.places, locale) })}
             </p>
           </div>
           <Stagger className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             {divisions.map((d) => (
-              <StaggerItem key={d.id} className="rounded-xl border border-border bg-card p-3 shadow-xs">
-                <MapPin className="size-4 text-primary" aria-hidden />
+              <StaggerItem
+                key={d.id}
+                className="border-border bg-card rounded-xl border p-3 shadow-xs"
+              >
+                <MapPin className="text-primary size-4" aria-hidden />
                 <p className="mt-2 font-semibold">{name(d)}</p>
-                <p className="mt-0.5 text-xs text-muted-foreground">{t("coverage.districts", { count: num(d.districts, locale) })}</p>
-                <p className="text-xs text-muted-foreground">{t("coverage.upazilas", { count: num(d.upazilas, locale) })}</p>
+                <p className="text-muted-foreground mt-0.5 text-xs">
+                  {t("coverage.districts", { count: num(d.districts, locale) })}
+                </p>
+                <p className="text-muted-foreground text-xs">
+                  {t("coverage.upazilas", { count: num(d.upazilas, locale) })}
+                </p>
               </StaggerItem>
             ))}
           </Stagger>
@@ -455,10 +550,13 @@ export default async function LandingPage() {
       </section>
 
       {/* ----------------------------------------------------------- Safety */}
-      <section id="safety" className="scroll-mt-20 border-t border-border bg-card/60 py-10 sm:py-14">
+      <section
+        id="safety"
+        className="border-border bg-card/60 scroll-mt-20 border-t py-10 sm:py-14"
+      >
         <div className="mx-auto grid w-full max-w-6xl items-start gap-8 px-4 sm:px-6 lg:grid-cols-[0.9fr_1.1fr] lg:gap-10">
           <FadeUp className="relative lg:sticky lg:top-24">
-            <div className="relative aspect-[4/3] overflow-hidden rounded-3xl border border-border bg-gradient-to-br from-primary/30 to-muted">
+            <div className="border-border from-primary/30 to-muted relative aspect-[4/3] overflow-hidden rounded-3xl border bg-gradient-to-br">
               <Image
                 src={images.safety.src}
                 alt={images.safety.alt}
@@ -468,8 +566,8 @@ export default async function LandingPage() {
                 sizes="(max-width: 1024px) 100vw, 45vw"
                 className="object-cover"
               />
-              <div className="absolute inset-x-4 bottom-4 flex items-center gap-3 rounded-2xl bg-card/95 p-3 shadow-lg backdrop-blur">
-                <ShieldCheck className="size-8 shrink-0 text-primary" aria-hidden />
+              <div className="bg-card/95 absolute inset-x-4 bottom-4 flex items-center gap-3 rounded-2xl p-3 shadow-lg backdrop-blur">
+                <ShieldCheck className="text-primary size-8 shrink-0" aria-hidden />
                 <p className="text-sm font-medium">{t("safety.text")}</p>
               </div>
             </div>
@@ -479,10 +577,17 @@ export default async function LandingPage() {
             <SectionHeading title={t("safety.title")} align="left" />
             <Stagger className="mt-5 grid gap-3 sm:grid-cols-2">
               {safety.map((point) => (
-                <StaggerItem key={point.key} className="rounded-xl border border-border bg-background p-4 shadow-xs">
-                  <point.icon className="size-5 text-primary" aria-hidden />
-                  <h3 className="mt-2 text-sm font-semibold">{t(`safety.${point.key}Title`)}</h3>
-                  <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{t(`safety.${point.key}Text`)}</p>
+                <StaggerItem
+                  key={point.key}
+                  className="border-border bg-background rounded-xl border p-4 shadow-xs"
+                >
+                  <point.icon className="text-primary size-5" aria-hidden />
+                  <h3 className="mt-2 text-sm font-semibold">
+                    {t(`safety.${point.key}Title`)}
+                  </h3>
+                  <p className="text-muted-foreground mt-1 text-sm leading-relaxed">
+                    {t(`safety.${point.key}Text`)}
+                  </p>
                 </StaggerItem>
               ))}
             </Stagger>
@@ -495,18 +600,28 @@ export default async function LandingPage() {
         <div className="mx-auto w-full max-w-6xl px-4 sm:px-6">
           <FadeUp className="grid items-center gap-6 overflow-hidden rounded-3xl bg-[#0b3a35] p-6 text-white sm:p-9 lg:grid-cols-[1.3fr_1fr]">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-amber-300">{t("host.eyebrow")}</p>
-              <h2 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">{t("host.title")}</h2>
+              <p className="text-xs font-semibold tracking-[0.14em] text-amber-300 uppercase">
+                {t("host.eyebrow")}
+              </p>
+              <h2 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">
+                {t("host.title")}
+              </h2>
               <p className="mt-3 max-w-xl text-white/80">{t("host.text")}</p>
               <ul className="mt-4 space-y-2">
                 {(["point1", "point2", "point3"] as const).map((p) => (
                   <li key={p} className="flex items-start gap-2.5 text-sm text-white/90">
-                    <Check className="mt-0.5 size-4 shrink-0 text-amber-300" aria-hidden />
+                    <Check
+                      className="mt-0.5 size-4 shrink-0 text-amber-300"
+                      aria-hidden
+                    />
                     {t(`host.${p}`)}
                   </li>
                 ))}
               </ul>
-              <Button asChild className="mt-5 bg-amber-400 text-[#0b3a35] hover:bg-amber-300">
+              <Button
+                asChild
+                className="mt-5 bg-amber-400 text-[#0b3a35] hover:bg-amber-300"
+              >
                 <Link href="/sign-up?next=/host">
                   <Mic2 aria-hidden /> {t("host.cta")}
                 </Link>
@@ -528,22 +643,35 @@ export default async function LandingPage() {
       </section>
 
       {/* --------------------------------------------------------------- FAQ */}
-      <section id="faq" className="scroll-mt-20 border-t border-border bg-card/60 py-10 sm:py-14">
+      <section
+        id="faq"
+        className="border-border bg-card/60 scroll-mt-20 border-t py-10 sm:py-14"
+      >
         <div className="mx-auto w-full max-w-5xl px-4 sm:px-6">
           <SectionHeading title={t("faq.title")} />
           <FadeUp delay={0.08} className="mt-6">
             {/* Two columns on wide screens keeps the section short. */}
             <div className="grid items-start gap-3 lg:grid-cols-2">
               {[faqs.slice(0, 4), faqs.slice(4)].map((column, i) => (
-                <div key={i} className="rounded-2xl border border-border bg-background px-5 shadow-xs [&>*:last-child]:border-b-0">
+                <div
+                  key={i}
+                  className="border-border bg-background rounded-2xl border px-5 shadow-xs [&>*:last-child]:border-b-0"
+                >
                   {column.map((faq) => (
-                    <Disclosure key={faq.question} question={faq.question} answer={faq.answer} />
+                    <Disclosure
+                      key={faq.question}
+                      question={faq.question}
+                      answer={faq.answer}
+                    />
                   ))}
                 </div>
               ))}
             </div>
-            <p className="mt-4 text-center text-sm text-muted-foreground">
-              <Link href="/guidelines" className="font-medium text-primary hover:underline">
+            <p className="text-muted-foreground mt-4 text-center text-sm">
+              <Link
+                href="/guidelines"
+                className="text-primary font-medium hover:underline"
+              >
                 {t("faq.more")}
               </Link>
             </p>
@@ -554,7 +682,7 @@ export default async function LandingPage() {
       {/* --------------------------------------------------------------- CTA */}
       <section className="py-10 sm:py-12">
         <div className="mx-auto w-full max-w-6xl px-4 sm:px-6">
-          <div className="relative overflow-hidden rounded-3xl border border-border bg-primary/10">
+          <div className="border-border bg-primary/10 relative overflow-hidden rounded-3xl border">
             <Image
               src={images.cta.src}
               alt={images.cta.alt}
@@ -564,19 +692,26 @@ export default async function LandingPage() {
               sizes="100vw"
               className="object-cover"
             />
-            <div className="absolute inset-0 bg-gradient-to-r from-background via-background/90 to-background/30" />
+            <div className="from-background via-background/90 to-background/30 absolute inset-0 bg-gradient-to-r" />
             <div className="relative px-6 py-9 sm:px-10 sm:py-11">
               <FadeUp className="max-w-lg">
                 <LogoMark className="size-9" />
-                <h2 className="mt-3 text-2xl font-semibold tracking-tight sm:text-3xl">{t("cta.title")}</h2>
-                <p className="mt-3 text-muted-foreground">{t("cta.text")}</p>
+                <h2 className="mt-3 text-2xl font-semibold tracking-tight sm:text-3xl">
+                  {t("cta.title")}
+                </h2>
+                <p className="text-muted-foreground mt-3">{t("cta.text")}</p>
                 <div className="mt-5 flex flex-wrap gap-3">
                   <Button size="lg" asChild className="h-11 px-6">
                     <Link href="/sign-up">
                       {t("cta.button")} <ArrowRight aria-hidden />
                     </Link>
                   </Button>
-                  <Button size="lg" variant="outline" asChild className="h-11 bg-background/80">
+                  <Button
+                    size="lg"
+                    variant="outline"
+                    asChild
+                    className="bg-background/80 h-11"
+                  >
                     <Link href="/sign-in">{t("cta.secondary")}</Link>
                   </Button>
                 </div>

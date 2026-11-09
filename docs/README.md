@@ -36,8 +36,8 @@ Two facts explain most of the codebase:
 
 1. **Everything is server-first.** Pages read through `lib/queries`, writes go
    through wrapped Server Actions, and authorization is re-checked at every layer.
-2. **Everything is locale-aware and BCP-47 bilingual.** URLs always carry `/en` or
-   `/bn`, and every user-facing string lives in `messages/`.
+2. **Everything is locale-aware and BCP-47 bilingual.** A cookie selects English
+   or Bangla without changing the URL, and every user-facing string lives in `messages/`.
 
 ## Glossary
 

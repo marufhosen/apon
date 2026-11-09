@@ -7,7 +7,12 @@ import { Loader2, Languages } from "lucide-react";
 import { toast } from "sonner";
 
 import { usePathname, useRouter } from "@/i18n/navigation";
-import { locales, type Locale } from "@/i18n/routing";
+import {
+  LOCALE_COOKIE_NAME,
+  PREFERENCE_MAX_AGE,
+  locales,
+  type Locale,
+} from "@/i18n/routing";
 import { updateLanguage } from "@/lib/actions/profile";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -15,8 +20,8 @@ import { cn } from "@/lib/utils";
 const LABELS: Record<Locale, string> = { en: "English", bn: "বাংলা" };
 
 /**
- * Saves the preference on the user record *and* swaps the URL prefix, so the
- * choice sticks for the next visit and the page re-renders in the new language.
+ * Saves the preference on the user record and in the locale cookie, then
+ * re-renders the current clean URL in the selected language.
  */
 export function LanguageForm() {
   const t = useTranslations("settings");
@@ -36,13 +41,14 @@ export function LanguageForm() {
         return;
       }
       toast.success(t("saved"));
+      document.cookie = `${LOCALE_COOKIE_NAME}=${next}; Path=/; Max-Age=${PREFERENCE_MAX_AGE}; SameSite=Lax`;
       router.replace(pathname, { locale: next });
     });
   }
 
   return (
     <div className="space-y-3">
-      <p className="text-sm text-muted-foreground">{t("languageHint")}</p>
+      <p className="text-muted-foreground text-sm">{t("languageHint")}</p>
 
       <div className="flex flex-wrap gap-2">
         {locales.map((option) => (

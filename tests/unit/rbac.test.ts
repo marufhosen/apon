@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { can, decideAccess, homePathFor, ruleFor, toRole, type AccessSubject } from "@/lib/rbac";
+import {
+  can,
+  decideAccess,
+  homePathFor,
+  ruleFor,
+  toRole,
+  type AccessSubject,
+} from "@/lib/rbac";
 
 const member: AccessSubject = { role: "member", onboarded: true };
 const newMember: AccessSubject = { role: "member", onboarded: false };
@@ -32,24 +39,45 @@ describe("decideAccess", () => {
   });
 
   it("sends signed-out visitors to sign-in with a return path", () => {
-    expect(decideAccess(seg("circles/3"), null, "/en/circles/3")).toEqual({
+    expect(decideAccess(seg("circles/3"), null, "/circles/3")).toEqual({
       kind: "redirect",
-      to: "/sign-in?next=%2Fen%2Fcircles%2F3",
+      to: "/sign-in?next=%2Fcircles%2F3",
     });
-    expect(decideAccess(seg("admin"), null)).toEqual({ kind: "redirect", to: "/sign-in" });
+    expect(decideAccess(seg("admin"), null)).toEqual({
+      kind: "redirect",
+      to: "/sign-in",
+    });
   });
 
   it("keeps signed-in users out of the auth pages", () => {
-    expect(decideAccess(seg("sign-in"), member)).toEqual({ kind: "redirect", to: "/home" });
-    expect(decideAccess(seg("verify"), admin)).toEqual({ kind: "redirect", to: "/admin" });
-    expect(decideAccess(seg("sign-up"), member)).toEqual({ kind: "redirect", to: "/home" });
+    expect(decideAccess(seg("sign-in"), member)).toEqual({
+      kind: "redirect",
+      to: "/home",
+    });
+    expect(decideAccess(seg("verify"), admin)).toEqual({
+      kind: "redirect",
+      to: "/admin",
+    });
+    expect(decideAccess(seg("sign-up"), member)).toEqual({
+      kind: "redirect",
+      to: "/home",
+    });
     expect(decideAccess(seg("sign-up"), null)).toEqual({ kind: "allow" });
   });
 
   it("routes /dashboard to each role's panel", () => {
-    expect(decideAccess(seg("dashboard"), member)).toEqual({ kind: "redirect", to: "/home" });
-    expect(decideAccess(seg("dashboard"), host)).toEqual({ kind: "redirect", to: "/home" });
-    expect(decideAccess(seg("dashboard"), admin)).toEqual({ kind: "redirect", to: "/admin" });
+    expect(decideAccess(seg("dashboard"), member)).toEqual({
+      kind: "redirect",
+      to: "/home",
+    });
+    expect(decideAccess(seg("dashboard"), host)).toEqual({
+      kind: "redirect",
+      to: "/home",
+    });
+    expect(decideAccess(seg("dashboard"), admin)).toEqual({
+      kind: "redirect",
+      to: "/admin",
+    });
   });
 
   it("forbids the admin panel to members and hosts", () => {
@@ -66,7 +94,10 @@ describe("decideAccess", () => {
   });
 
   it("requires onboarding for member pages, except setup pages and admins", () => {
-    expect(decideAccess(seg("home"), newMember)).toEqual({ kind: "redirect", to: "/onboarding" });
+    expect(decideAccess(seg("home"), newMember)).toEqual({
+      kind: "redirect",
+      to: "/onboarding",
+    });
     expect(decideAccess(seg("onboarding"), newMember)).toEqual({ kind: "allow" });
     expect(decideAccess(seg("settings"), newMember)).toEqual({ kind: "allow" });
     expect(decideAccess(seg("home"), admin)).toEqual({ kind: "allow" });

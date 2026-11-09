@@ -28,7 +28,7 @@ export default defineConfig({
     ? undefined
     : {
         command: "npm run dev",
-        url: `${BASE_URL}/en`,
+        url: BASE_URL,
         reuseExistingServer: true,
         timeout: 180_000,
         stdout: "pipe",

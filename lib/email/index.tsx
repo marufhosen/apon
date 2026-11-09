@@ -170,10 +170,7 @@ export function sendAccountExistsEmail(input: { to: string; locale: string }) {
             ? "কেউ (সম্ভবত আপনি) এই ইমেইল দিয়ে নতুন অ্যাকাউন্ট খোলার চেষ্টা করেছেন। আপনার অ্যাকাউন্ট আগে থেকেই আছে — সাইন ইন করুন, অথবা পাসওয়ার্ড ভুলে গেলে রিসেট করুন।"
             : "Someone (probably you) tried to create a new account with this email. You already have one — sign in, or reset your password if you've forgotten it."}
         </EmailParagraph>
-        <EmailButton
-          href={`${appUrl()}/${bn ? "bn" : "en"}/sign-in`}
-          label={bn ? "সাইন ইন" : "Sign in"}
-        />
+        <EmailButton href={`${appUrl()}/sign-in`} label={bn ? "সাইন ইন" : "Sign in"} />
         <EmailParagraph>
           {bn
             ? "এটি আপনি না হলে ইমেইলটি নিশ্চিন্তে এড়িয়ে যান।"
@@ -203,7 +200,7 @@ export function sendCircleInviteEmail(input: {
           bn ? "আপনার নতুন সার্কেল অপেক্ষা করছে" : "You have been invited to a circle"
         }
         heading={input.circleName}
-        footer={`${bn ? "নোটিফিকেশন সেটিংস" : "Notification settings"}: ${appUrl()}/${bn ? "bn" : "en"}/settings`}
+        footer={`${bn ? "নোটিফিকেশন সেটিংস" : "Notification settings"}: ${appUrl()}/settings`}
       >
         <EmailParagraph>
           {bn
@@ -211,7 +208,7 @@ export function sendCircleInviteEmail(input: {
             : `A small circle of ${input.memberCount} people has been formed around your interests and availability. Start by picking the day that works for everyone.`}
         </EmailParagraph>
         <EmailButton
-          href={`${appUrl()}/${bn ? "bn" : "en"}/circles/${input.circleId}`}
+          href={`${appUrl()}/circles/${input.circleId}`}
           label={bn ? "সার্কেল দেখুন" : "Open your circle"}
         />
       </EmailLayout>
@@ -235,7 +232,7 @@ export function sendActivityReminderEmail(input: {
       <EmailLayout
         preview={input.title}
         heading={input.title}
-        footer={`${bn ? "নোটিফিকেশন সেটিংস" : "Notification settings"}: ${appUrl()}/${bn ? "bn" : "en"}/settings`}
+        footer={`${bn ? "নোটিফিকেশন সেটিংস" : "Notification settings"}: ${appUrl()}/settings`}
       >
         <EmailParagraph>
           {bn ? "আপনি যাচ্ছেন:" : "You are going:"} {input.when}
@@ -271,7 +268,7 @@ export function sendWaitlistPromotionEmail(input: {
       <EmailLayout
         preview={input.title}
         heading={bn ? "আপনার আসন নিশ্চিত!" : "You are in!"}
-        footer={`${bn ? "নোটিফিকেশন সেটিংস" : "Notification settings"}: ${appUrl()}/${bn ? "bn" : "en"}/settings`}
+        footer={`${bn ? "নোটিফিকেশন সেটিংস" : "Notification settings"}: ${appUrl()}/settings`}
       >
         <EmailParagraph>
           {bn
@@ -316,7 +313,7 @@ export function sendHostApprovalEmail(input: {
               : "Unfortunately we can't approve your application at this time. You are welcome to apply again later."}
         </EmailParagraph>
         <EmailButton
-          href={`${appUrl()}/${bn ? "bn" : "en"}/host`}
+          href={`${appUrl()}/host`}
           label={bn ? "হোস্ট ড্যাশবোর্ড" : "Host dashboard"}
         />
       </EmailLayout>
@@ -341,7 +338,7 @@ export function sendFeedbackRequestEmail(input: {
       <EmailLayout
         preview={input.title}
         heading={bn ? "কেমন লাগল?" : "How did it go?"}
-        footer={`${bn ? "নোটিফিকেশন সেটিংস" : "Notification settings"}: ${appUrl()}/${bn ? "bn" : "en"}/settings`}
+        footer={`${bn ? "নোটিফিকেশন সেটিংস" : "Notification settings"}: ${appUrl()}/settings`}
       >
         <EmailParagraph>
           {bn

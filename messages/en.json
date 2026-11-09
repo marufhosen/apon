@@ -33,6 +33,8 @@
     "admin": "Admin",
     "member": "Member",
     "language": "Language",
+    "switchToLight": "Switch to light mode",
+    "switchToDark": "Switch to dark mode",
     "signIn": "Sign in",
     "signOut": "Sign out",
     "spotsLeft": "{count, plural, one {# spot left} other {# spots left}}",

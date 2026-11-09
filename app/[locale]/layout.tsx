@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { cookies } from "next/headers";
 import { Inter, Hind_Siliguri } from "next/font/google";
 import { NextIntlClientProvider } from "next-intl";
 import { getMessages, getTranslations } from "next-intl/server";
@@ -10,6 +11,12 @@ import { Toaster } from "sonner";
 
 import { isLocale } from "@/i18n/routing";
 import { cn } from "@/lib/utils";
+import {
+  THEME_COOKIE_NAME,
+  THEME_MAX_AGE,
+  THEME_STORAGE_KEY,
+  isTheme,
+} from "@/lib/theme";
 
 import "@/app/globals.css";
 
@@ -61,8 +68,8 @@ export const viewport: Viewport = {
   initialScale: 1,
 };
 
-/** Applies the saved theme before first paint so there is no flash. */
-const themeScript = `(function(){try{var s=localStorage.getItem("bondhu-theme");var d=s==="dark"||(!s&&window.matchMedia("(prefers-color-scheme: dark)").matches);if(d)document.documentElement.classList.add("dark");}catch(e){}})();`;
+/** Migrates the old localStorage preference and handles first-visit system theme. */
+const themeScript = `(function(){try{var c=document.cookie.match(/(?:^|; )${THEME_COOKIE_NAME}=([^;]+)/);var s=c?decodeURIComponent(c[1]):localStorage.getItem("${THEME_STORAGE_KEY}");var d=s==="dark"||(!s&&window.matchMedia("(prefers-color-scheme: dark)").matches);document.documentElement.classList.toggle("dark",d);if(!c&&(s==="light"||s==="dark")){document.cookie="${THEME_COOKIE_NAME}="+s+"; Path=/; Max-Age=${THEME_MAX_AGE}; SameSite=Lax";}}catch(e){}})();`;
 
 export default async function LocaleLayout({
   children,
@@ -74,16 +81,22 @@ export default async function LocaleLayout({
   const { locale } = await params;
   if (!isLocale(locale)) notFound();
 
-  const messages = await getMessages();
+  const [messages, cookieStore] = await Promise.all([getMessages(), cookies()]);
+  const savedTheme = cookieStore.get(THEME_COOKIE_NAME)?.value;
+  const theme = isTheme(savedTheme) ? savedTheme : null;
 
   return (
-    <html lang={locale} suppressHydrationWarning>
+    <html
+      lang={locale}
+      className={theme === "dark" ? "dark" : undefined}
+      suppressHydrationWarning
+    >
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
       <body
         className={cn(
-          "min-h-dvh bg-background font-sans text-foreground antialiased",
+          "bg-background text-foreground min-h-dvh font-sans antialiased",
           inter.variable,
           hindSiliguri.variable,
           locale === "bn" && "bn-body",
@@ -91,7 +104,7 @@ export default async function LocaleLayout({
       >
         <a
           href="#main"
-          className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-lg focus:bg-primary focus:px-4 focus:py-2 focus:text-primary-foreground"
+          className="focus:bg-primary focus:text-primary-foreground sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[100] focus:rounded-lg focus:px-4 focus:py-2"
         >
           Skip to content
         </a>
