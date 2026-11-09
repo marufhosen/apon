@@ -386,15 +386,7 @@
         "afternoon": "Afternoon",
         "evening": "Evening"
       },
-      "weekdays": [
-        "Sun",
-        "Mon",
-        "Tue",
-        "Wed",
-        "Thu",
-        "Fri",
-        "Sat"
-      ],
+      "weekdays": ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
       "weekdaysFull": [
         "Sunday",
         "Monday",
@@ -783,6 +775,7 @@
     "submit": "Send feedback",
     "submitted": "Thank you — your feedback is private.",
     "already": "You have already given feedback for this activity.",
+    "notReady": "Feedback opens after the activity is completed.",
     "later": "Maybe later",
     "titleCard": "Feedback for {title}"
   },
@@ -792,6 +785,10 @@
     "emptyText": "Circle invites, reminders and updates will show up here.",
     "markAll": "Mark all as read",
     "unread": "{count} unread",
+    "messages": {
+      "activityUpdated": "The time, venue, or capacity changed. The activity is awaiting review.",
+      "circleMembershipChanged": "A member left your circle. We updated the circle status."
+    },
     "types": {
       "circle_invite": "You were invited to a circle",
       "circle_activated": "Your circle is now active",
@@ -886,6 +883,7 @@
       "cancel": "Cancel",
       "complete": "Mark completed",
       "updated": "Activity updated.",
+      "pastApproval": "A past activity cannot be approved.",
       "empty": "No activities in this state.",
       "filterStatus": "Status",
       "womenOnly": "Women only"

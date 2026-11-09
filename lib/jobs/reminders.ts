@@ -1,13 +1,13 @@
 import "server-only";
 
 import { and, eq, gt, lt, sql } from "drizzle-orm";
-import { format } from "date-fns";
 
 import { db } from "@/lib/db";
 import { activities, areas, notifications, rsvps, users, venues } from "@/lib/db/schema";
 import { sendActivityReminderEmail } from "@/lib/email";
 import { notify } from "@/lib/notify";
 import { emailAllowed } from "@/lib/queries/users";
+import { formatDateTime } from "@/lib/dates";
 
 /**
  * 24-hour reminders for upcoming activities.
@@ -68,7 +68,7 @@ export async function sendUpcomingReminders(): Promise<{ sent: number }> {
         userId: attendee.user.id,
         type: "activity_reminder",
         title: row.activity.title,
-        body: format(row.activity.startsAt, "EEE d MMM, HH:mm"),
+        body: formatDateTime(row.activity.startsAt, attendee.user.locale),
         href: `/activities/${row.activity.id}`,
         payload: { activityId: row.activity.id },
       });
@@ -77,8 +77,9 @@ export async function sendUpcomingReminders(): Promise<{ sent: number }> {
         await sendActivityReminderEmail({
           to: attendee.user.email,
           locale: attendee.user.locale,
+          activityId: row.activity.id,
           title: row.activity.title,
-          when: format(row.activity.startsAt, "EEE d MMM, HH:mm"),
+          when: formatDateTime(row.activity.startsAt, attendee.user.locale),
           address: row.venueAddress ?? undefined,
         }).catch((err) => console.error("[reminders] email failed", err));
       }

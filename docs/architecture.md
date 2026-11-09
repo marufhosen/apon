@@ -276,6 +276,5 @@ paths and, for activities, the `activities` tag.
   so references stay valid.
 - **No PG enums.** Status columns are `text` + Zod; adding a value is a code change
   plus a docs change, not a migration.
-- **Circle activation is missing** (see above).
 - **`users.area_id` has no foreign key**, and a few status invariants are enforced
   only in application code — read `docs/data-model.md` before writing SQL by hand.

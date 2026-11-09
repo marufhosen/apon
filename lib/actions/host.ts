@@ -15,7 +15,11 @@ import {
   updateActivitySchema,
 } from "@/lib/validations";
 import { sendHostApprovalEmail } from "@/lib/email";
-import { cleanupReplacedImage, resolveOwnedAttachment, resolveOwnedImage } from "@/lib/uploads/server";
+import {
+  cleanupReplacedImage,
+  resolveOwnedAttachment,
+  resolveOwnedImage,
+} from "@/lib/uploads/server";
 import { notify } from "@/lib/notify";
 void sendHostApprovalEmail;
 
@@ -47,17 +51,31 @@ export const applyToHost = createAction({
       throw new ActionError("host.apply.pending");
     }
 
-    const attachmentUploadId = await resolveOwnedAttachment(user.id, input.attachmentUploadId, "host_document");
+    const attachmentUploadId = await resolveOwnedAttachment(
+      user.id,
+      input.attachmentUploadId,
+      "host_document",
+    );
 
     if (current) {
       await db
         .update(hostApplications)
-        .set({ motivation: input.motivation, experience: input.experience, attachmentUploadId, status: "pending" })
+        .set({
+          motivation: input.motivation,
+          experience: input.experience,
+          attachmentUploadId,
+          status: "pending",
+        })
         .where(eq(hostApplications.id, current.id));
     } else {
       await db
         .insert(hostApplications)
-        .values({ userId: user.id, motivation: input.motivation, experience: input.experience, attachmentUploadId });
+        .values({
+          userId: user.id,
+          motivation: input.motivation,
+          experience: input.experience,
+          attachmentUploadId,
+        });
     }
 
     await notify({
@@ -92,7 +110,7 @@ export const createActivity = createAction({
     const startsAt = new Date(`${input.date}T${input.startTime}:00+06:00`);
     const endsAt = new Date(`${input.date}T${input.endTime}:00+06:00`);
     if (Number.isNaN(startsAt.getTime()) || Number.isNaN(endsAt.getTime())) {
-      throw new ActionError("errors.validation", { date: ["Invalid date"] });
+      throw new ActionError("errors.validation", { date: ["errors.validation"] });
     }
 
     const rows = await db
@@ -138,7 +156,11 @@ export const updateActivity = createAction({
   handler: async (input, { user }: ActionContext) => {
     assertHostRole(user.role);
 
-    const venueRows = await db.select().from(venues).where(eq(venues.id, input.venueId)).limit(1);
+    const venueRows = await db
+      .select()
+      .from(venues)
+      .where(eq(venues.id, input.venueId))
+      .limit(1);
     const venue = venueRows[0];
     if (!venue || !venue.approved || !venue.isPublic) {
       throw new ActionError("host.form.venueHint", { venueId: ["host.form.venueHint"] });
@@ -146,6 +168,9 @@ export const updateActivity = createAction({
 
     const startsAt = new Date(`${input.date}T${input.startTime}:00+06:00`);
     const endsAt = new Date(`${input.date}T${input.endTime}:00+06:00`);
+    if (Number.isNaN(startsAt.getTime()) || Number.isNaN(endsAt.getTime())) {
+      throw new ActionError("errors.validation", { date: ["errors.validation"] });
+    }
 
     const result = await db.transaction(async (tx) => {
       const rows = await tx
@@ -181,6 +206,28 @@ export const updateActivity = createAction({
         activity.imageUrl,
       );
 
+      const materialChanges = [
+        activity.startsAt.getTime() !== startsAt.getTime() ||
+        activity.endsAt.getTime() !== endsAt.getTime()
+          ? "time"
+          : null,
+        activity.venueId !== venue.id ? "venue" : null,
+        activity.capacity !== input.capacity ? "capacity" : null,
+      ].filter((change): change is string => change !== null);
+
+      const attendees =
+        materialChanges.length > 0
+          ? await tx
+              .select({ userId: rsvps.userId })
+              .from(rsvps)
+              .where(
+                and(
+                  eq(rsvps.activityId, input.id),
+                  inArray(rsvps.status, ["going", "waitlist"]),
+                ),
+              )
+          : [];
+
       await tx
         .update(activities)
         .set({
@@ -201,10 +248,30 @@ export const updateActivity = createAction({
         })
         .where(eq(activities.id, input.id));
 
-      return { previousImage: activity.imageUrl, nextImage };
+      return {
+        previousImage: activity.imageUrl,
+        nextImage,
+        attendeeIds: attendees.map((attendee) => attendee.userId),
+        materialChanges,
+      };
     });
 
     await cleanupReplacedImage(result.previousImage, result.nextImage);
+
+    for (const attendeeId of result.attendeeIds) {
+      await notify({
+        userId: attendeeId,
+        type: "generic",
+        title: input.title,
+        href: `/activities/${input.id}`,
+        payload: {
+          activityId: input.id,
+          messageKey: "activityUpdated",
+          changes: result.materialChanges,
+        },
+      });
+    }
+
     return { activityId: input.id };
   },
 });
@@ -240,7 +307,10 @@ export const cancelActivity = createAction({
         .from(rsvps)
         .innerJoin(users, eq(rsvps.userId, users.id))
         .where(
-          and(eq(rsvps.activityId, input.id), inArray(rsvps.status, ["going", "waitlist"])),
+          and(
+            eq(rsvps.activityId, input.id),
+            inArray(rsvps.status, ["going", "waitlist"]),
+          ),
         );
 
       await tx
@@ -253,7 +323,10 @@ export const cancelActivity = createAction({
         .update(rsvps)
         .set({ status: "cancelled", checkedIn: false, updatedAt: new Date() })
         .where(
-          and(eq(rsvps.activityId, input.id), inArray(rsvps.status, ["going", "waitlist"])),
+          and(
+            eq(rsvps.activityId, input.id),
+            inArray(rsvps.status, ["going", "waitlist"]),
+          ),
         );
 
       return { activity, attendees, cancelled: true };

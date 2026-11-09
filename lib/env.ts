@@ -2,6 +2,8 @@ import "server-only";
 
 import { z } from "zod";
 
+import { productionSmsConfigurationError } from "@/lib/sms/config";
+
 // Standalone scripts (`tsx`) don't get Next's .env loading — do it ourselves.
 // `loadEnvFile` never overrides variables already present in the environment.
 if (!process.env.DATABASE_URL) {
@@ -48,7 +50,9 @@ const schema = z.object({
   CLOUDINARY_URL: z
     .string()
     .trim()
-    .regex(/^cloudinary:\/\/[^:]+:[^@]+@.+$/, { message: "CLOUDINARY_URL must look like cloudinary://key:secret@cloud" })
+    .regex(/^cloudinary:\/\/[^:]+:[^@]+@.+$/, {
+      message: "CLOUDINARY_URL must look like cloudinary://key:secret@cloud",
+    })
     .optional(),
   /** Top-level folder for every asset, e.g. "apon" → apon/avatars/… */
   CLOUDINARY_FOLDER: z.string().trim().default("apon"),
@@ -64,7 +68,9 @@ if (!parsed.success) {
   const issues = parsed.error.issues
     .map((i) => `  • ${i.path.join(".") || "(root)"}: ${i.message}`)
     .join("\n");
-  throw new Error(`Invalid environment variables:\n${issues}\n\nCopy .env.example to .env and fill it in.`);
+  throw new Error(
+    `Invalid environment variables:\n${issues}\n\nCopy .env.example to .env and fill it in.`,
+  );
 }
 
 export const env = parsed.data;
@@ -73,27 +79,39 @@ export const env = parsed.data;
 export const emailEnabled = Boolean(env.RESEND_API_KEY);
 
 /** True when real SMS delivery is configured (otherwise we log to console). */
-export const smsEnabled = env.SMS_PROVIDER === "twilio" && Boolean(env.TWILIO_ACCOUNT_SID);
+export const smsEnabled =
+  env.SMS_PROVIDER === "twilio" && Boolean(env.TWILIO_ACCOUNT_SID);
 
 /** Resolved Cloudinary credentials (separate variables win over CLOUDINARY_URL). */
 export const cloudinaryConfig = (() => {
   const fromUrl = env.CLOUDINARY_URL?.match(/^cloudinary:\/\/([^:]+):([^@]+)@(.+)$/);
   const apiKey = env.CLOUDINARY_API_KEY || fromUrl?.[1];
-  const apiSecret = env.CLOUDINARY_API_SECRET || (fromUrl ? decodeURIComponent(fromUrl[2]) : undefined);
+  const apiSecret =
+    env.CLOUDINARY_API_SECRET || (fromUrl ? decodeURIComponent(fromUrl[2]) : undefined);
   const cloudName = env.CLOUDINARY_CLOUD_NAME || fromUrl?.[3];
   return apiKey && apiSecret && cloudName
-    ? { apiKey, apiSecret, cloudName, folder: env.CLOUDINARY_FOLDER, apiBase: env.CLOUDINARY_API_BASE.replace(/\/$/, "") }
+    ? {
+        apiKey,
+        apiSecret,
+        cloudName,
+        folder: env.CLOUDINARY_FOLDER,
+        apiBase: env.CLOUDINARY_API_BASE.replace(/\/$/, ""),
+      }
     : null;
 })();
 
 /** True when uploads can be sent to Cloudinary. */
 export const uploadsEnabled = cloudinaryConfig !== null;
 
-if (env.NODE_ENV === "production" && env.SMS_PROVIDER === "console") {
-  console.warn(
-    "[env] SMS_PROVIDER=console in production: phone OTP delivery will fail. Set SMS_PROVIDER=twilio with credentials.",
-  );
-}
+const smsConfigurationError = productionSmsConfigurationError({
+  nodeEnv: env.NODE_ENV,
+  nextPhase: process.env.NEXT_PHASE,
+  provider: env.SMS_PROVIDER,
+  accountSid: env.TWILIO_ACCOUNT_SID,
+  authToken: env.TWILIO_AUTH_TOKEN,
+  from: env.TWILIO_FROM,
+});
+if (smsConfigurationError) throw new Error(smsConfigurationError);
 
 if (!uploadsEnabled && env.CLOUDINARY_API_KEY && env.NODE_ENV !== "test") {
   console.warn(

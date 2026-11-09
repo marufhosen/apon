@@ -39,6 +39,12 @@ export default async function NotificationsPage() {
       ) : (
         <div className="space-y-2">
           {items.map((item) => {
+            const payload = item.payload as { messageKey?: unknown };
+            const messageKey =
+              typeof payload.messageKey === "string"
+                ? `messages.${payload.messageKey}`
+                : null;
+            const body = messageKey && t.has(messageKey) ? t(messageKey) : item.body;
             const content = (
               <Card
                 className={cn(
@@ -61,11 +67,13 @@ export default async function NotificationsPage() {
                         <Badge variant="secondary">{t("unread", { count: 1 })}</Badge>
                       ) : null}
                     </div>
-                    {item.body ? (
-                      <p className="mt-0.5 text-sm text-muted-foreground">{item.body}</p>
+                    {body ? (
+                      <p className="text-muted-foreground mt-0.5 text-sm">{body}</p>
                     ) : null}
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {t.has(`types.${item.type}`) ? t(`types.${item.type}`) : t("types.generic")}
+                    <p className="text-muted-foreground mt-1 text-xs">
+                      {t.has(`types.${item.type}`)
+                        ? t(`types.${item.type}`)
+                        : t("types.generic")}
                       {" · "}
                       {formatDateTime(item.createdAt, user.locale)}
                     </p>

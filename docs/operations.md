@@ -28,7 +28,8 @@ Production:
 - `RESEND_API_KEY` + `EMAIL_FROM` — required; without the key verification and
   reset emails cannot be delivered and production send failures throw
 - Cloudinary credentials if uploads are enabled
-- Twilio credentials only if `SMS_PROVIDER=twilio`
+- `SMS_PROVIDER=twilio` plus all Twilio credentials — the production runtime
+  fails fast without working SMS because RSVP depends on phone verification
 
 Development/test may omit all integrations; behavior is described in
 `docs/development.md`.
@@ -147,9 +148,6 @@ circle and members who met the same circle 3+ times.
 
 ## Known operational gaps
 
-- **Circle activation:** matching creates `forming` circles and no code path makes
-  them `active`, so newly matched members cannot open them yet. Seed data is
-  active. Fix before production use of matching.
 - **No matching lock:** two concurrent runs can create duplicate circles.
 - **No realtime:** circle chat updates on refresh/revalidation only.
 - **No hosted job runner or CI:** scheduling and checks are external.

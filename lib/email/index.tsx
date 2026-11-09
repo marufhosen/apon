@@ -4,12 +4,8 @@ import type { ReactElement } from "react";
 import { render } from "@react-email/render";
 import { Resend } from "resend";
 import { emailEnabled, env } from "@/lib/env";
-import {
-  EmailButton,
-  EmailLayout,
-  EmailParagraph,
-  OtpCode,
-} from "@/lib/email/templates";
+import { EmailButton, EmailLayout, EmailParagraph, OtpCode } from "@/lib/email/templates";
+import { activityUrl } from "@/lib/email/urls";
 
 /**
  * Email delivery.
@@ -35,7 +31,8 @@ export interface SendEmailInput {
 export async function sendEmail({ to, subject, react }: SendEmailInput): Promise<void> {
   if (!emailEnabled) {
     // Development fallback only — production refuses to send auth codes this way.
-    if (env.NODE_ENV !== "production") console.log(`\n[email:dev] → ${to} | ${subject}\n`);
+    if (env.NODE_ENV !== "production")
+      console.log(`\n[email:dev] → ${to} | ${subject}\n`);
     return;
   }
   try {
@@ -53,7 +50,10 @@ export async function sendEmail({ to, subject, react }: SendEmailInput): Promise
       }
     }
   } catch (err) {
-    console.warn(`[email:resend:warn] Error sending to ${to}:`, err instanceof Error ? err.message : err);
+    console.warn(
+      `[email:resend:warn] Error sending to ${to}:`,
+      err instanceof Error ? err.message : err,
+    );
     if (env.NODE_ENV !== "development") {
       throw err;
     }
@@ -80,22 +80,32 @@ export function sendAuthCodeEmail(input: {
 }) {
   if (!emailEnabled && env.NODE_ENV === "production") {
     // Never fall back to logging a credential code in production.
-    throw new Error("RESEND_API_KEY must be set in production to send verification codes");
+    throw new Error(
+      "RESEND_API_KEY must be set in production to send verification codes",
+    );
   }
   const bn = input.locale === "bn";
   const verify = input.purpose === "email-verification";
   const copy = verify
     ? {
-        subject: bn ? `APON ইমেইল যাচাই কোড: ${input.code}` : `Verify your APON email: ${input.code}`,
-        preview: bn ? "আপনার APON অ্যাকাউন্ট যাচাই করুন" : "Confirm your email to finish creating your APON account",
+        subject: bn
+          ? `APON ইমেইল যাচাই কোড: ${input.code}`
+          : `Verify your APON email: ${input.code}`,
+        preview: bn
+          ? "আপনার APON অ্যাকাউন্ট যাচাই করুন"
+          : "Confirm your email to finish creating your APON account",
         heading: bn ? "আপনার ইমেইল যাচাই করুন" : "Verify your email",
         body: bn
           ? "APON-এ স্বাগতম! অ্যাকাউন্ট খোলা শেষ করতে নিচের কোডটি দিন। কোডটি ১০ মিনিট পর্যন্ত কাজ করবে।"
           : "Welcome to APON! Enter the code below to finish creating your account. It is valid for 10 minutes.",
       }
     : {
-        subject: bn ? `APON পাসওয়ার্ড রিসেট কোড: ${input.code}` : `Reset your APON password: ${input.code}`,
-        preview: bn ? "আপনার পাসওয়ার্ড রিসেট করুন" : "Use this code to choose a new password",
+        subject: bn
+          ? `APON পাসওয়ার্ড রিসেট কোড: ${input.code}`
+          : `Reset your APON password: ${input.code}`,
+        preview: bn
+          ? "আপনার পাসওয়ার্ড রিসেট করুন"
+          : "Use this code to choose a new password",
         heading: bn ? "পাসওয়ার্ড রিসেট করুন" : "Reset your password",
         body: bn
           ? "নতুন পাসওয়ার্ড সেট করতে নিচের কোডটি দিন। কোডটি ১০ মিনিট পর্যন্ত কাজ করবে। রিসেটের পর আপনার সব ডিভাইস থেকে সাইন আউট হয়ে যাবে।"
@@ -127,10 +137,14 @@ export function sendAccountExistsEmail(input: { to: string; locale: string }) {
   const bn = input.locale === "bn";
   return sendEmail({
     to: input.to,
-    subject: bn ? "আপনার ইতিমধ্যে একটি APON অ্যাকাউন্ট আছে" : "You already have an APON account",
+    subject: bn
+      ? "আপনার ইতিমধ্যে একটি APON অ্যাকাউন্ট আছে"
+      : "You already have an APON account",
     react: (
       <EmailLayout
-        preview={bn ? "সাইন ইন করুন বা পাসওয়ার্ড রিসেট করুন" : "Sign in or reset your password"}
+        preview={
+          bn ? "সাইন ইন করুন বা পাসওয়ার্ড রিসেট করুন" : "Sign in or reset your password"
+        }
         heading={bn ? "আপনার অ্যাকাউন্ট আছে" : "You already have an account"}
       >
         <EmailParagraph>
@@ -138,9 +152,14 @@ export function sendAccountExistsEmail(input: { to: string; locale: string }) {
             ? "কেউ (সম্ভবত আপনি) এই ইমেইল দিয়ে নতুন অ্যাকাউন্ট খোলার চেষ্টা করেছেন। আপনার অ্যাকাউন্ট আগে থেকেই আছে — সাইন ইন করুন, অথবা পাসওয়ার্ড ভুলে গেলে রিসেট করুন।"
             : "Someone (probably you) tried to create a new account with this email. You already have one — sign in, or reset your password if you've forgotten it."}
         </EmailParagraph>
-        <EmailButton href={`${appUrl()}/${bn ? "bn" : "en"}/sign-in`} label={bn ? "সাইন ইন" : "Sign in"} />
+        <EmailButton
+          href={`${appUrl()}/${bn ? "bn" : "en"}/sign-in`}
+          label={bn ? "সাইন ইন" : "Sign in"}
+        />
         <EmailParagraph>
-          {bn ? "এটি আপনি না হলে ইমেইলটি নিশ্চিন্তে এড়িয়ে যান।" : "If this wasn't you, you can safely ignore this email."}
+          {bn
+            ? "এটি আপনি না হলে ইমেইলটি নিশ্চিন্তে এড়িয়ে যান।"
+            : "If this wasn't you, you can safely ignore this email."}
         </EmailParagraph>
       </EmailLayout>
     ),
@@ -162,7 +181,9 @@ export function sendCircleInviteEmail(input: {
       : `Your weekly circle is ready — ${input.circleName}`,
     react: (
       <EmailLayout
-        preview={bn ? "আপনার নতুন সার্কেল অপেক্ষা করছে" : "You have been invited to a circle"}
+        preview={
+          bn ? "আপনার নতুন সার্কেল অপেক্ষা করছে" : "You have been invited to a circle"
+        }
         heading={input.circleName}
         footer={`${bn ? "নোটিফিকেশন সেটিংস" : "Notification settings"}: ${appUrl()}/${bn ? "bn" : "en"}/settings`}
       >
@@ -183,6 +204,7 @@ export function sendCircleInviteEmail(input: {
 export function sendActivityReminderEmail(input: {
   to: string;
   locale: string;
+  activityId: number;
   title: string;
   when: string;
   address?: string;
@@ -206,7 +228,7 @@ export function sendActivityReminderEmail(input: {
           </EmailParagraph>
         ) : null}
         <EmailButton
-          href={`${appUrl()}/${bn ? "bn" : "en"}/activities`}
+          href={activityUrl(appUrl(), input.activityId, input.locale)}
           label={bn ? "বিস্তারিত দেখুন" : "View details"}
         />
       </EmailLayout>
@@ -217,6 +239,7 @@ export function sendActivityReminderEmail(input: {
 export function sendWaitlistPromotionEmail(input: {
   to: string;
   locale: string;
+  activityId: number;
   title: string;
   when: string;
 }) {
@@ -239,7 +262,7 @@ export function sendWaitlistPromotionEmail(input: {
         </EmailParagraph>
         <EmailParagraph>{input.when}</EmailParagraph>
         <EmailButton
-          href={`${appUrl()}/${bn ? "bn" : "en"}/activities`}
+          href={activityUrl(appUrl(), input.activityId, input.locale)}
           label={bn ? "আয়োজনটি দেখুন" : "View activity"}
         />
       </EmailLayout>
@@ -247,7 +270,11 @@ export function sendWaitlistPromotionEmail(input: {
   });
 }
 
-export function sendHostApprovalEmail(input: { to: string; locale: string; approved: boolean }) {
+export function sendHostApprovalEmail(input: {
+  to: string;
+  locale: string;
+  approved: boolean;
+}) {
   const bn = input.locale === "bn";
   const title = input.approved
     ? bn
@@ -282,13 +309,16 @@ export function sendHostApprovalEmail(input: { to: string; locale: string; appro
 export function sendFeedbackRequestEmail(input: {
   to: string;
   locale: string;
+  activityId: number;
   title: string;
   circleName?: string;
 }) {
   const bn = input.locale === "bn";
   return sendEmail({
     to: input.to,
-    subject: bn ? "আড্ডা কেমন হলো? — আপনার মতামত জানান" : "How was it? — share your feedback",
+    subject: bn
+      ? "আড্ডা কেমন হলো? — আপনার মতামত জানান"
+      : "How was it? — share your feedback",
     react: (
       <EmailLayout
         preview={input.title}
@@ -301,7 +331,7 @@ export function sendFeedbackRequestEmail(input: {
             : `"${input.title}" has wrapped up. Take a minute to answer three questions — they stay private.`}
         </EmailParagraph>
         <EmailButton
-          href={`${appUrl()}/${bn ? "bn" : "en"}/activities`}
+          href={activityUrl(appUrl(), input.activityId, input.locale)}
           label={bn ? "মতামত দিন" : "Give feedback"}
         />
       </EmailLayout>

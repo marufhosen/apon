@@ -55,6 +55,8 @@ Email/username + password, built on Better Auth (`lib/auth.ts`):
   Verification codes are hashed at rest in production.
 - The old passwordless email-code and phone-code sign-ins are disabled. Phone OTP is only
   used to attach a verified number in Settings.
+- Production runtime requires `SMS_PROVIDER=twilio` and all three Twilio credentials because
+  verified phone numbers gate RSVP. A misconfigured production process fails at startup.
 - **Existing accounts** created with email codes have no password. They set one with
   _Forgot password_ (the reset creates the password).
 

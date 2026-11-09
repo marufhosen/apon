@@ -34,20 +34,20 @@ table (query by email); they are not sent anywhere unless `RESEND_API_KEY` is se
 Validated once in `lib/env.ts`; a missing/malformed required value fails at import
 with a readable message.
 
-| Variable                                                                 | Required    | Behavior                                                              |
-| ------------------------------------------------------------------------ | ----------- | --------------------------------------------------------------------- |
-| `DATABASE_URL`                                                           | yes         | Must start with `postgres://` or `postgresql://`                      |
-| `BETTER_AUTH_SECRET`                                                     | yes         | ≥16 chars; use 32+ random chars                                       |
-| `BETTER_AUTH_URL`                                                        | no          | Default `http://localhost:3000`; must match the served origin         |
-| `NEXT_PUBLIC_APP_URL`                                                    | no          | Default `http://localhost:3000`; trusted origin and email links       |
-| `RESEND_API_KEY`                                                         | production  | Empty in dev → email is logged; production throws on send failure     |
-| `EMAIL_FROM`                                                             | no          | Default `APON <onboarding@resend.dev>`                                |
-| `SMS_PROVIDER`                                                           | no          | `console` (default) or `twilio`                                       |
-| `TWILIO_ACCOUNT_SID` / `TWILIO_AUTH_TOKEN` / `TWILIO_FROM`               | with Twilio | SMS OTP delivery                                                      |
-| `CLOUDINARY_CLOUD_NAME` / `CLOUDINARY_API_KEY` / `CLOUDINARY_API_SECRET` | optional    | All three needed; or use `CLOUDINARY_URL`                             |
-| `CLOUDINARY_FOLDER`                                                      | no          | Default `apon`                                                        |
-| `CLOUDINARY_API_BASE`                                                    | no          | Test-only override for the local Cloudinary stand-in                  |
-| `MATCHING_DAY`                                                           | no          | 0=Sun…6=Sat, default 1; scheduling convention (external cron decides) |
+| Variable                                                                 | Required   | Behavior                                                              |
+| ------------------------------------------------------------------------ | ---------- | --------------------------------------------------------------------- |
+| `DATABASE_URL`                                                           | yes        | Must start with `postgres://` or `postgresql://`                      |
+| `BETTER_AUTH_SECRET`                                                     | yes        | ≥16 chars; use 32+ random chars                                       |
+| `BETTER_AUTH_URL`                                                        | no         | Default `http://localhost:3000`; must match the served origin         |
+| `NEXT_PUBLIC_APP_URL`                                                    | no         | Default `http://localhost:3000`; trusted origin and email links       |
+| `RESEND_API_KEY`                                                         | production | Empty in dev → email is logged; production throws on send failure     |
+| `EMAIL_FROM`                                                             | no         | Default `APON <onboarding@resend.dev>`                                |
+| `SMS_PROVIDER`                                                           | production | `console` in dev; production runtime requires `twilio`                |
+| `TWILIO_ACCOUNT_SID` / `TWILIO_AUTH_TOKEN` / `TWILIO_FROM`               | production | All three are required for production SMS OTP delivery                |
+| `CLOUDINARY_CLOUD_NAME` / `CLOUDINARY_API_KEY` / `CLOUDINARY_API_SECRET` | optional   | All three needed; or use `CLOUDINARY_URL`                             |
+| `CLOUDINARY_FOLDER`                                                      | no         | Default `apon`                                                        |
+| `CLOUDINARY_API_BASE`                                                    | no         | Test-only override for the local Cloudinary stand-in                  |
+| `MATCHING_DAY`                                                           | no         | 0=Sun…6=Sat, default 1; scheduling convention (external cron decides) |
 
 Secrets are server-only: never add `NEXT_PUBLIC_` to any credential, and never
 commit `.env`.

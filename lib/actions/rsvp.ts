@@ -12,6 +12,7 @@ import { pickPromotion, resolveRsvpStatus, toRsvpStatus } from "@/lib/rsvp/waitl
 import { sendWaitlistPromotionEmail } from "@/lib/email";
 import { notify } from "@/lib/notify";
 import { emailAllowed } from "@/lib/queries/users";
+import { formatDateTime } from "@/lib/dates";
 
 export interface RsvpResult {
   status: "going" | "waitlist" | "cancelled";
@@ -82,7 +83,9 @@ export const rsvpAction = createAction({
           .select({ rsvp: rsvps, user: users, createdAt: rsvps.createdAt })
           .from(rsvps)
           .innerJoin(users, eq(rsvps.userId, users.id))
-          .where(and(eq(rsvps.activityId, input.activityId), eq(rsvps.status, "waitlist")))
+          .where(
+            and(eq(rsvps.activityId, input.activityId), eq(rsvps.status, "waitlist")),
+          )
           .orderBy(asc(rsvps.createdAt))
           .limit(1);
 
@@ -159,8 +162,9 @@ export const rsvpAction = createAction({
         await sendWaitlistPromotionEmail({
           to: outcome.promoted.email,
           locale: outcome.promoted.locale,
+          activityId: outcome.promoted.activityId,
           title: outcome.promoted.title,
-          when: outcome.promoted.startsAt.toISOString(),
+          when: formatDateTime(outcome.promoted.startsAt, outcome.promoted.locale),
         }).catch((err) => console.error("[rsvp] promotion email failed", err));
       }
     }

@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, or, sql } from "drizzle-orm";
 
 import { db } from "@/lib/db";
 import {
@@ -30,7 +30,10 @@ export async function getMyCircle(userId: string) {
         sql`${circles.deletedAt} is null`,
       ),
     )
-    .orderBy(sql`case when ${circles.status} = 'active' then 0 else 1 end`, desc(circles.createdAt))
+    .orderBy(
+      sql`case when ${circles.status} = 'active' then 0 else 1 end`,
+      desc(circles.createdAt),
+    )
     .limit(1);
 
   const row = membership[0];
@@ -40,8 +43,16 @@ export async function getMyCircle(userId: string) {
 }
 
 /** Membership-scoped bundle used by the circle page. */
-export async function getCircleBundle(circleId: number, membershipId: number, userId: string) {
-  const circleRows = await db.select().from(circles).where(eq(circles.id, circleId)).limit(1);
+export async function getCircleBundle(
+  circleId: number,
+  membershipId: number,
+  userId: string,
+) {
+  const circleRows = await db
+    .select()
+    .from(circles)
+    .where(eq(circles.id, circleId))
+    .limit(1);
   const circle = circleRows[0];
   if (!circle) return null;
 
@@ -59,7 +70,12 @@ export async function getCircleBundle(circleId: number, membershipId: number, us
     })
     .from(circleMembers)
     .innerJoin(users, eq(circleMembers.userId, users.id))
-    .where(eq(circleMembers.circleId, circleId))
+    .where(
+      and(
+        eq(circleMembers.circleId, circleId),
+        or(eq(circleMembers.status, "active"), eq(circleMembers.id, membershipId)),
+      ),
+    )
     .orderBy(asc(circleMembers.createdAt));
 
   const nextActivities = await db
@@ -92,10 +108,7 @@ export async function getCircleBundle(circleId: number, membershipId: number, us
       .where(eq(pollOptions.pollId, poll.id))
       .orderBy(asc(pollOptions.id));
 
-    const votes = await db
-      .select()
-      .from(pollVotes)
-      .where(eq(pollVotes.pollId, poll.id));
+    const votes = await db.select().from(pollVotes).where(eq(pollVotes.pollId, poll.id));
 
     pollBundle = {
       poll,
@@ -109,7 +122,7 @@ export async function getCircleBundle(circleId: number, membershipId: number, us
     };
   }
 
-  const messages = await db
+  const recentMessages = await db
     .select({
       message: circleMessages,
       user: { id: users.id, name: users.name, avatarUrl: users.avatarUrl },
@@ -117,8 +130,10 @@ export async function getCircleBundle(circleId: number, membershipId: number, us
     .from(circleMessages)
     .innerJoin(users, eq(circleMessages.userId, users.id))
     .where(eq(circleMessages.circleId, circleId))
-    .orderBy(asc(circleMessages.createdAt))
+    .orderBy(desc(circleMessages.createdAt))
     .limit(200);
+
+  const messages = recentMessages.reverse();
 
   const myMembership = members.find((m) => m.membership.id === membershipId);
 
@@ -134,7 +149,10 @@ export async function getCircleBundle(circleId: number, membershipId: number, us
 
 export interface PollBundle {
   poll: typeof polls.$inferSelect;
-  options: (typeof pollOptions.$inferSelect & { voteCount: number; votedByMe: boolean })[];
+  options: (typeof pollOptions.$inferSelect & {
+    voteCount: number;
+    votedByMe: boolean;
+  })[];
   myVoteCount: number;
   totalVotes: number;
 }
@@ -154,7 +172,10 @@ export async function listCircles() {
   return db
     .select({
       circle: circles,
-      memberCount: sql<number>`(select count(*) from circle_members cm where cm.circle_id = ${circles.id} and cm.status = 'active')`.mapWith(Number),
+      memberCount:
+        sql<number>`(select count(*) from circle_members cm where cm.circle_id = ${circles.id} and cm.status = 'active')`.mapWith(
+          Number,
+        ),
       zoneLabel: circles.zone,
     })
     .from(circles)
@@ -184,7 +205,11 @@ export async function getActiveCircleMemberIds() {
  * admins through the Reports queue).
  */
 export async function getAdminCircleDetail(circleId: number) {
-  const [circle] = await db.select().from(circles).where(eq(circles.id, circleId)).limit(1);
+  const [circle] = await db
+    .select()
+    .from(circles)
+    .where(eq(circles.id, circleId))
+    .limit(1);
   if (!circle) return null;
 
   const [zoneRow] = await db
@@ -224,7 +249,12 @@ export async function getAdminCircleDetail(circleId: number) {
       .where(and(eq(activities.circleId, circleId), sql`${activities.startsAt} > now()`))
       .orderBy(asc(activities.startsAt))
       .limit(5),
-    db.select().from(polls).where(eq(polls.circleId, circleId)).orderBy(desc(polls.createdAt)).limit(1),
+    db
+      .select()
+      .from(polls)
+      .where(eq(polls.circleId, circleId))
+      .orderBy(desc(polls.createdAt))
+      .limit(1),
     db
       .select({
         total: sql<number>`count(*)::int`,

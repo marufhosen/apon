@@ -222,8 +222,9 @@ revalidate/tags, handler })` → `ActionError` for user-visible failures → cal
   key, uploads are disabled and the UI says so.
 - `host_applications_pending_unique` is unique on `user_id` alone: one
   application row per member, not one pending row.
-- `users.area_id` has no foreign key, and `users.email` has no database unique
-  constraint (only `username` is unique). Do not assume either in raw SQL.
+- `users.area_id` has no foreign key. Email uniqueness is enforced by the
+  case-insensitive `users_email_unique` index; preserve that invariant in
+  schema changes and raw SQL.
 - Matching creates circles as `forming` with `invited` members. Members accept
   or decline; the circle becomes `active` once three members have accepted. If
   every invitee answers and fewer than three accepted, the circle is archived

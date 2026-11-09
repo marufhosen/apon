@@ -43,7 +43,11 @@ export const adminUserUpdate = createAction({
       throw new ActionError("errors.validation");
     }
 
-    const target = await db.select().from(users).where(eq(users.id, input.userId)).limit(1);
+    const target = await db
+      .select()
+      .from(users)
+      .where(eq(users.id, input.userId))
+      .limit(1);
     if (!target.length) throw new ActionError("errors.notFoundTitle");
 
     const patch =
@@ -79,7 +83,11 @@ export const resolveReport = createAction({
   authorize: "admin",
   revalidate: ["/admin/reports", "/admin"],
   handler: async (input, { user }: ActionContext) => {
-    const rows = await db.select().from(reports).where(eq(reports.id, input.reportId)).limit(1);
+    const rows = await db
+      .select()
+      .from(reports)
+      .where(eq(reports.id, input.reportId))
+      .limit(1);
     if (!rows.length) throw new ActionError("errors.notFoundTitle");
 
     await db
@@ -169,13 +177,17 @@ export const reviewHostApplication = createAction({
 
     if (applicant) {
       if (input.status === "approved") {
-        await db.update(users).set({ role: "host", updatedAt: new Date() }).where(eq(users.id, applicant.id));
+        await db
+          .update(users)
+          .set({ role: "host", updatedAt: new Date() })
+          .where(eq(users.id, applicant.id));
       }
 
       await notify({
         userId: applicant.id,
         type: "host_approval",
-        title: input.status === "approved" ? "You are a host now" : "Host application update",
+        title:
+          input.status === "approved" ? "You are a host now" : "Host application update",
         body: input.status,
         href: "/host",
         payload: { status: input.status },
@@ -206,7 +218,11 @@ export const reviewActivity = createAction({
   tags: ["activities"],
   handler: async (input, { user }: ActionContext) => {
     void user;
-    const rows = await db.select().from(activities).where(eq(activities.id, input.activityId)).limit(1);
+    const rows = await db
+      .select()
+      .from(activities)
+      .where(eq(activities.id, input.activityId))
+      .limit(1);
     const activity = rows[0];
     if (!activity) throw new ActionError("errors.notFoundTitle");
 
@@ -218,6 +234,9 @@ export const reviewActivity = createAction({
     };
     if (!allowedFrom[input.action].includes(activity.status)) {
       throw new ActionError("errors.validation");
+    }
+    if (input.action === "approve" && activity.startsAt <= new Date()) {
+      throw new ActionError("admin.activities.pastApproval");
     }
 
     const status =
@@ -232,7 +251,10 @@ export const reviewActivity = createAction({
       .set({
         status,
         updatedAt: new Date(),
-        cancellationReason: input.action === "reject" ? "Not approved by admin" : activity.cancellationReason,
+        cancellationReason:
+          input.action === "reject"
+            ? "Not approved by admin"
+            : activity.cancellationReason,
       })
       .where(eq(activities.id, input.activityId));
 
@@ -290,9 +312,20 @@ export const saveVenue = createAction({
   handler: async (input, { user }: ActionContext) => {
     await assertSelectableLocation(input.areaId);
     const existing = input.id
-      ? (await db.select({ imageUrl: venues.imageUrl }).from(venues).where(eq(venues.id, input.id)).limit(1))[0]
+      ? (
+          await db
+            .select({ imageUrl: venues.imageUrl })
+            .from(venues)
+            .where(eq(venues.id, input.id))
+            .limit(1)
+        )[0]
       : undefined;
-    const imageUrl = await resolveOwnedImage(user.id, input.imageUrl, "venue_photo", existing?.imageUrl);
+    const imageUrl = await resolveOwnedImage(
+      user.id,
+      input.imageUrl,
+      "venue_photo",
+      existing?.imageUrl,
+    );
     const values = {
       name: input.name,
       areaId: input.areaId,

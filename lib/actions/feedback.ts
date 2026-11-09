@@ -27,14 +27,22 @@ export const submitFeedback = createAction({
       .limit(1);
     const activity = activityRows[0];
     if (!activity) throw new ActionError("errors.notFoundTitle");
+    if (activity.status !== "completed" || activity.endsAt > new Date()) {
+      throw new ActionError("feedback.notReady");
+    }
 
-    const rsvpRows = await db
+    const [mine] = await db
       .select()
       .from(rsvps)
-      .where(eq(rsvps.activityId, input.activityId))
-      .limit(50);
-    const mine = rsvpRows.find((r) => r.userId === user.id);
-    if (!mine || mine.status !== "going") throw new ActionError("errors.unauthorized");
+      .where(
+        and(
+          eq(rsvps.activityId, input.activityId),
+          eq(rsvps.userId, user.id),
+          eq(rsvps.status, "going"),
+        ),
+      )
+      .limit(1);
+    if (!mine) throw new ActionError("errors.unauthorized");
 
     const existing = await db
       .select({ id: feedback.id })

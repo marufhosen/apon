@@ -2,7 +2,7 @@
 
 import "server-only";
 
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, sql } from "drizzle-orm";
 
 import { ActionError, type ActionContext, createAction } from "@/lib/actions/action";
 import { db } from "@/lib/db";
@@ -32,6 +32,7 @@ import {
   settingsSchema,
 } from "@/lib/validations";
 import { notify } from "@/lib/notify";
+import { reconcileCircle, sendCircleStateNotifications } from "@/lib/circles/lifecycle";
 
 /** Edit public profile fields. */
 export const updateProfile = createAction({
@@ -142,7 +143,21 @@ export const deleteAccount = createAction({
         ),
       );
 
-    await db.transaction(async (tx) => {
+    const circleChanges = await db.transaction(async (tx) => {
+      const memberships = await tx
+        .select({ circleId: circleMembers.circleId })
+        .from(circleMembers)
+        .where(and(eq(circleMembers.userId, user.id), eq(circleMembers.status, "active")))
+        .orderBy(asc(circleMembers.circleId));
+
+      // Lock in a stable order so deletion and invitation responses cannot
+      // compute the same circle from different membership snapshots.
+      for (const membership of memberships) {
+        await tx.execute(
+          sql`select id from circles where id = ${membership.circleId} for update`,
+        );
+      }
+
       await tx.delete(userInterests).where(eq(userInterests.userId, user.id));
       await tx.delete(availability).where(eq(availability.userId, user.id));
       await tx.delete(preferences).where(eq(preferences.userId, user.id));
@@ -157,6 +172,14 @@ export const deleteAccount = createAction({
         .update(circleMembers)
         .set({ status: "left", leftAt: new Date() })
         .where(eq(circleMembers.userId, user.id));
+
+      const states = [];
+      for (const membership of memberships) {
+        states.push({
+          circleId: membership.circleId,
+          state: await reconcileCircle(tx, membership.circleId),
+        });
+      }
       await tx
         .update(activities)
         .set({ status: "cancelled", updatedAt: new Date() })
@@ -193,7 +216,15 @@ export const deleteAccount = createAction({
 
       await tx.execute(sql`delete from sessions where user_id = ${user.id}`);
       await tx.execute(sql`delete from accounts where user_id = ${user.id}`);
+
+      return states;
     });
+
+    for (const change of circleChanges) {
+      await sendCircleStateNotifications(change.circleId, change.state, {
+        membershipChanged: true,
+      });
+    }
 
     // After the transaction commits: remove their uploads (public images still
     // referenced by retained activity/venue records are kept).
