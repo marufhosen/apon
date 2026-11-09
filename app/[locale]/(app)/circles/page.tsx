@@ -7,6 +7,7 @@ import { getMyCircle } from "@/lib/queries/circles";
 import { PageHeader } from "@/components/features/shared/page-header";
 import { EmptyState } from "@/components/features/shared/empty-state";
 import { CircleRequestForm } from "@/components/features/circles/circle-request-form";
+import { CircleInviteActions } from "@/components/features/circles/circle-invite-actions";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -26,6 +27,12 @@ export default async function CirclesPage() {
     getMyCircle(user.id),
     getTranslations("errors"),
   ]);
+
+  const visibleMembers = circle
+    ? circle.members.filter(
+        (member) => member.membership.status === "active" || member.membership.status === "invited",
+      )
+    : [];
 
   return (
     <div className="space-y-5">
@@ -48,7 +55,7 @@ export default async function CirclesPage() {
               <p className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
                 <span className="flex items-center gap-1.5">
                   <Users className="size-4" aria-hidden />
-                  {t("memberCount", { count: circle.members.length })}
+                  {t("memberCount", { count: visibleMembers.length })}
                 </span>
                 <span className="flex items-center gap-1.5">
                   <MapPin className="size-4" aria-hidden />
@@ -59,7 +66,7 @@ export default async function CirclesPage() {
 
             <CardContent className="flex flex-wrap items-center justify-between gap-4">
               <div className="flex -space-x-2">
-                {circle.members.slice(0, 6).map((member) => (
+                {visibleMembers.slice(0, 6).map((member) => (
                   <Avatar key={member.membership.id} className="size-10 border-2 border-background">
                     {member.user.avatarUrl ? (
                       <AvatarImage src={member.user.avatarUrl} alt="" />
@@ -69,13 +76,26 @@ export default async function CirclesPage() {
                 ))}
               </div>
 
-              <Button asChild>
-                <Link href={`/circles/${circle.circle.id}`}>
-                  {t("viewActivity")}
-                  <ArrowRight aria-hidden />
-                </Link>
-              </Button>
+              {circle.myMembership?.membership.status === "invited" ? (
+                <div className="w-full space-y-2 sm:w-auto">
+                  <p className="text-sm text-muted-foreground">{t("inviteText")}</p>
+                  <CircleInviteActions circleId={circle.circle.id} />
+                </div>
+              ) : (
+                <Button asChild>
+                  <Link href={`/circles/${circle.circle.id}`}>
+                    {t("viewActivity")}
+                    <ArrowRight aria-hidden />
+                  </Link>
+                </Button>
+              )}
             </CardContent>
+
+            {circle.circle.status === "forming" ? (
+              <CardContent className="border-t border-border pt-4 text-sm text-muted-foreground">
+                {t("formingNotice")}
+              </CardContent>
+            ) : null}
 
             {circle.nextActivities.length ? (
               <CardContent className="border-t border-border pt-4 text-sm">

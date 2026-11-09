@@ -1,8 +1,12 @@
 import { Pool } from 'pg';
 
-const pool = new Pool({
-  connectionString: 'postgresql://postgres:1591@localhost:5432/circle'
-});
+const connectionString = process.env.DATABASE_URL;
+if (!connectionString) {
+  console.error('DATABASE_URL is required (the script no longer contains a connection string).');
+  process.exit(1);
+}
+
+const pool = new Pool({ connectionString });
 
 async function main() {
   const client = await pool.connect();

@@ -181,15 +181,12 @@ export const auth = betterAuth({
       allowedAttempts: 3,
       phoneNumberValidator: isValidBdPhone,
       sendOTP: async ({ phoneNumber, code }) => {
-        if (!isProduction) console.log(`[sms:dev] ${phoneNumber} -> ${code}`);
-        try {
-          await sendSms(
-            normalizeBdPhone(phoneNumber),
-            `Your APON code is ${code}. It expires in 5 minutes. Never share it.`,
-          );
-        } catch (err) {
-          console.warn(`[sms:otp:warn] Failed to send SMS:`, err instanceof Error ? err.message : err);
-        }
+        // Let delivery failures reach the caller: a code the member never
+        // received must not look like a successful send.
+        await sendSms(
+          normalizeBdPhone(phoneNumber),
+          `Your APON code is ${code}. It expires in 5 minutes. Never share it.`,
+        );
       },
     }),
 

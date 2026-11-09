@@ -100,15 +100,21 @@ export async function cleanupReplacedImage(previousUrl: string | null | undefine
   }
 }
 
-/** On account deletion: remove every public image the member uploaded. */
-export async function deleteUserPublicUploads(userId: string) {
-  if (!uploadsEnabled) return;
+/**
+ * On account deletion: remove every upload the member owns.
+ *
+ * Private evidence/documents are always destroyed. A public image still used
+ * by an activity or venue record is kept so that history does not break, but
+ * the member's own avatar/profile references have already been cleared.
+ */
+export async function deleteUserUploads(userId: string) {
   const rows = await db
     .select()
     .from(uploads)
-    .where(and(eq(uploads.ownerId, userId), eq(uploads.deliveryType, "upload"), isNull(uploads.deletedAt)));
+    .where(and(eq(uploads.ownerId, userId), isNull(uploads.deletedAt)));
   for (const row of rows) {
-    if (!(await isStillReferenced(row.secureUrl))) await deleteUploadRow(row);
+    if (row.deliveryType === "upload" && (await isStillReferenced(row.secureUrl))) continue;
+    await deleteUploadRow(row);
   }
 }
 

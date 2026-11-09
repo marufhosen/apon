@@ -8,7 +8,9 @@ import { db } from "@/lib/db";
 import {
   activities,
   areas,
+  circleMessages,
   circleRequests,
+  circles,
   hostApplications,
   reports,
   users,
@@ -129,6 +131,100 @@ export async function listReports(status: "open" | "actioned" | "dismissed" = "o
     .where(eq(reports.status, status))
     .orderBy(desc(reports.createdAt))
     .limit(100);
+}
+
+export type ReportTarget =
+  | {
+      kind: "message";
+      id: number;
+      body: string;
+      hiddenAt: Date | null;
+      createdAt: Date;
+      authorId: string;
+      authorName: string;
+      circleId: number;
+      circleName: string;
+    }
+  | {
+      kind: "activity";
+      id: number;
+      title: string;
+      status: string;
+      startsAt: Date;
+      hostName: string;
+    }
+  | {
+      kind: "user";
+      id: string;
+      name: string;
+      username: string | null;
+      status: string;
+      createdAt: Date;
+    }
+  | { kind: "missing"; targetType: string; targetId: string };
+
+/**
+ * Strictly loads the entity a report points at. Only this one item is exposed
+ * to the admin; the rest of a reported circle's chat stays private.
+ */
+export async function getReportTarget(report: {
+  targetType: string;
+  targetId: string;
+}): Promise<ReportTarget> {
+  const id = Number(report.targetId);
+
+  if (report.targetType === "message" && Number.isInteger(id)) {
+    const [row] = await db
+      .select({
+        id: circleMessages.id,
+        body: circleMessages.body,
+        hiddenAt: circleMessages.hiddenAt,
+        createdAt: circleMessages.createdAt,
+        authorId: users.id,
+        authorName: users.name,
+        circleId: circles.id,
+        circleName: circles.name,
+      })
+      .from(circleMessages)
+      .innerJoin(users, eq(circleMessages.userId, users.id))
+      .innerJoin(circles, eq(circleMessages.circleId, circles.id))
+      .where(eq(circleMessages.id, id))
+      .limit(1);
+    if (row) return { kind: "message", ...row };
+  }
+
+  if (report.targetType === "activity" && Number.isInteger(id)) {
+    const [row] = await db
+      .select({
+        id: activities.id,
+        title: activities.title,
+        status: activities.status,
+        startsAt: activities.startsAt,
+        hostName: users.name,
+      })
+      .from(activities)
+      .innerJoin(users, eq(activities.hostId, users.id))
+      .where(eq(activities.id, id))
+      .limit(1);
+    if (row) return { kind: "activity", ...row };
+  }
+
+  if (report.targetType === "user") {
+    const [row] = await db
+      .select({
+        id: users.id,
+        name: users.name,
+        username: users.displayUsername,
+        status: users.status,
+        createdAt: users.createdAt,
+      })
+      .from(users)
+      .where(eq(users.id, report.targetId))
+      .limit(1);
+    if (row) return { kind: "user", ...row };
+  }
+
+  return { kind: "missing", targetType: report.targetType, targetId: report.targetId };
 }
 
 /** Host applications awaiting review (or already reviewed). */

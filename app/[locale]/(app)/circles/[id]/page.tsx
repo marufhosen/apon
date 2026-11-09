@@ -12,6 +12,7 @@ import { PollCard } from "@/components/features/circles/poll-card";
 import { CreatePollForm } from "@/components/features/circles/create-poll-form";
 import { MessageThread } from "@/components/features/circles/message-thread";
 import { LeaveCircleButton } from "@/components/features/circles/leave-circle-button";
+import { CircleInviteActions } from "@/components/features/circles/circle-invite-actions";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -45,7 +46,15 @@ export default async function CircleDetailPage({
   if (!bundle) notFound();
 
   const { circle, members, nextActivities, poll, messages } = bundle;
+  if (circle.status === "archived") notFound();
+
+  const accepted = membership.status === "active";
   const activeMembers = members.filter((m) => m.membership.status === "active");
+  const visibleMembers = members.filter(
+    (m) =>
+      (m.membership.status === "active" || m.membership.status === "invited") &&
+      !blockedIds.has(m.user.id),
+  );
 
   const thread = messages
     .filter((row) => !blockedIds.has(row.user.id))
@@ -65,7 +74,13 @@ export default async function CircleDetailPage({
       <PageHeader
         title={circle.name}
         subtitle={t("timePollHint")}
-        actions={<LeaveCircleButton circleId={circle.id} />}
+        actions={
+          accepted ? (
+            <LeaveCircleButton circleId={circle.id} />
+          ) : (
+            <CircleInviteActions circleId={circle.id} />
+          )
+        }
       />
 
       <div className="flex flex-wrap items-center gap-2">
@@ -82,6 +97,24 @@ export default async function CircleDetailPage({
         </span>
       </div>
 
+      {!accepted ? (
+        <FadeUp>
+          <Card className="border-primary/30 bg-primary/5">
+            <CardHeader>
+              <CardTitle className="text-base">{t("inviteTitle")}</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <p className="text-sm text-muted-foreground">{t("inviteText")}</p>
+              <CircleInviteActions circleId={circle.id} />
+            </CardContent>
+          </Card>
+        </FadeUp>
+      ) : circle.status === "forming" ? (
+        <p className="rounded-xl border border-dashed border-border px-4 py-3 text-sm text-muted-foreground">
+          {t("formingNotice")}
+        </p>
+      ) : null}
+
       {/* ------------------------------------------------------------- Members */}
       <FadeUp>
         <Card>
@@ -90,7 +123,7 @@ export default async function CircleDetailPage({
           </CardHeader>
           <CardContent>
             <Stagger className="grid gap-3 sm:grid-cols-2">
-              {members.map((member) => (
+              {visibleMembers.map((member) => (
                 <StaggerItem key={member.membership.id}>
                   <Link
                     href={`/profile/${member.user.id}`}
@@ -155,7 +188,11 @@ export default async function CircleDetailPage({
       ) : null}
 
       {/* --------------------------------------------------------------- Poll */}
-      {poll ? (
+      {!accepted ? (
+        <p className="rounded-xl border border-dashed border-border px-4 py-3 text-sm text-muted-foreground">
+          {t("joinToParticipate")}
+        </p>
+      ) : poll ? (
         <FadeUp className="space-y-3">
           <PollCard
             poll={{ id: poll.poll.id, title: poll.poll.title, status: poll.poll.status }}
@@ -180,7 +217,9 @@ export default async function CircleDetailPage({
       )}
 
       {/* ------------------------------------------------------------ Comments */}
-      <MessageThread circleId={circle.id} currentUserId={user.id} messages={thread} />
+      {accepted ? (
+        <MessageThread circleId={circle.id} currentUserId={user.id} messages={thread} />
+      ) : null}
     </div>
   );
 }

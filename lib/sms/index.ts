@@ -15,6 +15,11 @@ export interface SmsProvider {
 
 const consoleProvider: SmsProvider = {
   async send(to, body) {
+    if (env.NODE_ENV === "production") {
+      throw new Error(
+        "SMS_PROVIDER=console is not allowed in production; configure Twilio or disable phone verification",
+      );
+    }
     console.log(`\n[sms:console] → ${to}\n${body}\n`);
   },
 };

@@ -64,6 +64,7 @@ export function ruleFor(segments: string[]): RouteRule {
     case "home":
     case "circles":
     case "activities":
+    case "notifications":
       return { section: "member", roles: ANY_SIGNED_IN, onboarding: true };
     default:
       return PUBLIC;

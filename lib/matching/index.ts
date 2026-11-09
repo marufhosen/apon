@@ -15,6 +15,7 @@ import {
   polls,
   preferences,
   userInterests,
+  userSettings,
   users,
 } from "@/lib/db/schema";
 import { sendCircleInviteEmail } from "@/lib/email";
@@ -61,6 +62,7 @@ export async function runMatching(): Promise<MatchingResult> {
           join circles c on c.id = cm.circle_id
           where cm.user_id = ${users.id}
             and cm.status in ('invited', 'active')
+            and c.status <> 'archived'
             and c.deleted_at is null
         )`,
       ),
@@ -190,7 +192,7 @@ export async function runMatching(): Promise<MatchingResult> {
           type: "circle_invite",
           title: created.name,
           body: `${group.memberIds.length} people near you. Pick a time that works.`,
-          href: "/circles",
+          href: `/circles/${created.id}`,
           payload: { circleId: created.id, averageScore: group.averageScore },
         })),
       );
@@ -200,20 +202,39 @@ export async function runMatching(): Promise<MatchingResult> {
 
     membersInvited += group.memberIds.length;
 
-    const emails = await db
-      .select({ email: users.email, locale: users.locale })
-      .from(users)
-      .where(inArray(users.id, group.memberIds));
+    const [emails, settings] = await Promise.all([
+      db
+        .select({ id: users.id, email: users.email, locale: users.locale })
+        .from(users)
+        .where(inArray(users.id, group.memberIds)),
+      db
+        .select({
+          userId: userSettings.userId,
+          emailCircleInvites: userSettings.emailCircleInvites,
+        })
+        .from(userSettings)
+        .where(inArray(userSettings.userId, group.memberIds)),
+    ]);
+
+    const inviteEmailsEnabled = new Set(
+      settings.filter((s) => s.emailCircleInvites).map((s) => s.userId),
+    );
 
     await Promise.all(
-      emails.map((e) =>
-        sendCircleInviteEmail({
-          to: e.email,
-          locale: e.locale,
-          circleName: circle.name,
-          memberCount: group.memberIds.length,
-        }).catch((err) => console.error("[matching] invite email failed", err)),
-      ),
+      emails
+        .filter(
+          (e) =>
+            !settings.some((s) => s.userId === e.id) || inviteEmailsEnabled.has(e.id),
+        )
+        .map((e) =>
+          sendCircleInviteEmail({
+            to: e.email,
+            locale: e.locale,
+            circleId: circle.id,
+            circleName: circle.name,
+            memberCount: group.memberIds.length,
+          }).catch((err) => console.error("[matching] invite email failed", err)),
+        ),
     );
   }
 

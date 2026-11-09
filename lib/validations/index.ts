@@ -215,6 +215,8 @@ export const circleRequestSchema = z.object({
 
 export const leaveCircleSchema = z.object({ circleId: z.coerce.number().int().positive() });
 
+export const circleInviteSchema = z.object({ circleId: z.coerce.number().int().positive() });
+
 // ---------------------------------------------------------------------------
 // Safety
 // ---------------------------------------------------------------------------
@@ -256,10 +258,18 @@ export const adminUserUpdateSchema = z.object({
   action: z.enum(["suspend", "restore", "member", "host", "admin"]),
 });
 
+export const circleRequestResolutionSchema = z.object({
+  requestId: z.coerce.number().int().positive(),
+});
+
 export const reportResolutionSchema = z.object({
   reportId: z.coerce.number().int().positive(),
   status: z.enum(["actioned", "dismissed"]),
   note: z.string().trim().max(500).optional().default(""),
+});
+
+export const moderateMessageSchema = z.object({
+  messageId: z.coerce.number().int().positive(),
 });
 
 export const hostApplicationReviewSchema = z.object({

@@ -3,7 +3,7 @@ import "server-only";
 import { and, eq, sql } from "drizzle-orm";
 
 import { db } from "@/lib/db";
-import { notifications } from "@/lib/db/schema";
+import { notifications, userSettings } from "@/lib/db/schema";
 
 export type NotificationType =
   | "circle_invite"
@@ -27,6 +27,15 @@ export interface CreateNotificationInput {
 /** Creates an in-app notification (never throws into the calling action). */
 export async function notify(input: CreateNotificationInput): Promise<void> {
   try {
+    const [settings] = await db
+      .select({ inAppNotifications: userSettings.inAppNotifications })
+      .from(userSettings)
+      .where(eq(userSettings.userId, input.userId))
+      .limit(1);
+
+    // Missing settings mean the defaults (in-app notifications on).
+    if (settings && !settings.inAppNotifications) return;
+
     await db.insert(notifications).values({
       userId: input.userId,
       type: input.type,

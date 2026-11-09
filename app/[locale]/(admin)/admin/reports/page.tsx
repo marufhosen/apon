@@ -4,8 +4,9 @@ import { getTranslations } from "next-intl/server";
 
 import { Link } from "@/i18n/navigation";
 import { requireAdmin } from "@/lib/session";
-import { listReports } from "@/lib/queries/admin";
+import { getReportTarget, listReports } from "@/lib/queries/admin";
 import { ReportActions } from "@/components/features/admin/report-actions";
+import { HideMessageButton } from "@/components/features/admin/hide-message-button";
 import { EmptyState } from "@/components/features/shared/empty-state";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -28,7 +29,10 @@ export default async function AdminReportsPage({
   const active = STATUSES.find((s) => s === status) ?? "open";
 
   const [t, rows] = await Promise.all([getTranslations("admin.reports"), listReports(active)]);
-  const attachments = await getAttachmentLinks(rows.map((r) => r.report.attachmentUploadId));
+  const [attachments, targets] = await Promise.all([
+    getAttachmentLinks(rows.map((r) => r.report.attachmentUploadId)),
+    Promise.all(rows.map((r) => getReportTarget(r.report))),
+  ]);
 
   return (
     <div className="space-y-5">
@@ -55,7 +59,9 @@ export default async function AdminReportsPage({
         <EmptyState title={t("empty")} />
       ) : (
         <div className="space-y-3">
-          {rows.map(({ report, reporterName }) => (
+          {rows.map(({ report, reporterName }, index) => {
+            const target = targets[index];
+            return (
             <Card key={report.id}>
               <CardContent className="space-y-3 pt-6">
                 <div className="flex flex-wrap items-center gap-2">
@@ -78,6 +84,61 @@ export default async function AdminReportsPage({
                   {report.details ? ` — ${report.details}` : ""}
                 </p>
 
+                <div className="rounded-xl border border-border bg-muted/40 p-3">
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    {t("targetPreview")}
+                  </p>
+                  {target.kind === "message" ? (
+                    <div className="mt-2 space-y-2">
+                      <p className="text-sm">“{target.body}”</p>
+                      <p className="text-xs text-muted-foreground">
+                        {t("messageBy", { name: target.authorName, circle: target.circleName })}
+                      </p>
+                      <div className="flex flex-wrap items-center gap-2">
+                        {target.hiddenAt ? (
+                          <Badge variant="secondary">{t("alreadyHidden")}</Badge>
+                        ) : (
+                          <HideMessageButton messageId={target.id} />
+                        )}
+                        <Link
+                          href={`/circles/${target.circleId}`}
+                          className="text-xs text-primary underline-offset-4 hover:underline"
+                        >
+                          {t("openCircle")}
+                        </Link>
+                      </div>
+                    </div>
+                  ) : target.kind === "activity" ? (
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <Link
+                        href={`/activities/${target.id}`}
+                        className="text-sm font-medium hover:underline"
+                      >
+                        {target.title}
+                      </Link>
+                      <Badge variant="outline">{target.status}</Badge>
+                      <span className="text-xs text-muted-foreground">
+                        {t("hostedBy", { name: target.hostName })}
+                      </span>
+                    </div>
+                  ) : target.kind === "user" ? (
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <Link
+                        href={`/profile/${target.id}`}
+                        className="text-sm font-medium hover:underline"
+                      >
+                        {target.name}
+                      </Link>
+                      {target.username ? (
+                        <span className="text-xs text-muted-foreground">@{target.username}</span>
+                      ) : null}
+                      <Badge variant="outline">{target.status}</Badge>
+                    </div>
+                  ) : (
+                    <p className="mt-2 text-sm text-muted-foreground">{t("missingTarget")}</p>
+                  )}
+                </div>
+
                 {report.attachmentUploadId ? (
                   <AttachmentLink attachment={attachments.get(report.attachmentUploadId)} />
                 ) : null}
@@ -85,7 +146,8 @@ export default async function AdminReportsPage({
                 {report.status === "open" ? <ReportActions reportId={report.id} /> : null}
               </CardContent>
             </Card>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

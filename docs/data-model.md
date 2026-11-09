@@ -36,7 +36,7 @@ users ──┬── user_interests ── interests ── activities.category
 | Column                                                 | Notes                                                                                                                                         |
 | ------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------- |
 | `id` (text, PK)                                        | Better Auth id                                                                                                                                |
-| `name`, `email`, `email_verified`, `image`             | core auth. `email` has **no DB unique constraint**; Better Auth de-duplicates in application code, so a race can in principle create two rows |
+| `name`, `email`, `email_verified`, `image`             | core auth. `email` is unique at the database level; `phone_number` is unique when present (PostgreSQL allows multiple NULLs) |
 | `username` (unique, lower-case), `display_username`    | username plugin                                                                                                                               |
 | `phone_number`, `phone_number_verified`                | phone plugin                                                                                                                                  |
 | `gender`, `birth_year`, `area_id`, `bio`, `avatar_url` | profile                                                                                                                                       |
@@ -47,10 +47,9 @@ users ──┬── user_interests ── interests ── activities.category
 | `guidelines_accepted_at`                               | stamped during onboarding                                                                                                                     |
 | `deleted_at`                                           | soft delete                                                                                                                                   |
 
-Indexes: `area_id`, `status`, `phone_number`. **`area_id` has no foreign key** —
-validate it with `assertSelectableLocation` before saving. **`email` is not
-unique** at the database level, unlike `username`; do not assume a constraint is
-there when writing raw SQL.
+Indexes: unique `email`, unique `phone_number` (nullable), `area_id`, `status`.
+**`area_id` has no foreign key** — validate it with `assertSelectableLocation`
+before saving.
 
 ### `sessions`, `accounts`, `verifications`, `rate_limits`
 
@@ -130,7 +129,10 @@ Indexes: `status`, `zone`.
 Unique `(circle_id, user_id)`. `role` is `member` \| `host`; `status` is
 `invited` \| `active` \| `left` \| `declined`, with `joined_at` / `left_at`.
 "Currently in a circle" means status in (`invited`, `active`) on a non-deleted,
-active circle — this is also the matching exclusion rule.
+non-archived circle — this is also the matching exclusion rule. A circle becomes
+`active` when three members have accepted; pending invitations keep it `forming`.
+If every invitee answers and fewer than three accepted, it is archived and the
+remaining members return to the matching pool.
 
 ### `circle_messages`, `circle_requests`
 
@@ -143,8 +145,8 @@ active circle — this is also the matching exclusion rule.
 
 A poll belongs to a circle (`open` \| `closed`, optional `closes_at`). Options
 carry a label and optional start/end. Votes are unique per
-`(poll_id, user_id)` — one choice per member per poll. The circle page shows the
-latest poll only.
+`(poll_id, user_id, option_id)` — a member may select several times that work,
+but only once per option. The circle page shows the latest poll only.
 
 ## Venues and activities
 
@@ -219,16 +221,17 @@ Rules:
 - Private rows must never be rendered with `secure_url` — use
   `getAttachmentLinks` (10-minute signed URL).
 - Public images still referenced by a user, activity or venue must not be deleted;
-  `cleanupReplacedImage` and `deleteUserPublicUploads` check first.
+  `cleanupReplacedImage` and `deleteUserUploads` check first. Private uploads are
+  always destroyed on account deletion.
 
 ## Deletion behavior
 
 | Action                           | Effect                                                                                                                                |
 | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| Delete account (`deleteAccount`) | Marks `users.deleted_at`, cancels RSVPs, leaves circles, deletes sessions, removes public Cloudinary images. Rows keep their history. |
+| Delete account (`deleteAccount`) | Marks `users.deleted_at`, clears username/display name, cancels RSVPs and hosted activities, leaves circles, deletes sessions and all uploads (public images still referenced by history are retained), and notifies affected attendees. Rows keep their history. |
 | Suspend member (admin)           | `users.status = suspended`, deletes sessions; the proxy signs them out.                                                               |
 | Delete venue (admin)             | Soft delete + `approved = false`; past activities keep the reference.                                                                 |
-| Leave circle                     | `circle_members.status = left`; circle becomes `forming` under 3 active members.                                                      |
+| Leave circle                     | `circle_members.status = left`; under 3 active members the circle returns to `forming` while invitations are pending, or is archived/released when nobody is left to answer. |
 | Cancel RSVP                      | `rsvps.status = cancelled`, promotes the next waitlisted member.                                                                      |
 | Replace image                    | Old upload soft-deleted and destroyed when no longer referenced.                                                                      |
 

@@ -224,12 +224,15 @@ revalidate/tags, handler })` → `ActionError` for user-visible failures → cal
   application row per member, not one pending row.
 - `users.area_id` has no foreign key, and `users.email` has no database unique
   constraint (only `username` is unique). Do not assume either in raw SQL.
-- Matching creates circles with status `forming`, but `getMyCircle` and every
-  circle action require `active`; no code path promotes `forming → active` today.
-  Treat this as a known gap before building on the circle lifecycle.
-- `scripts/apply-migration.mjs` is a one-off with a hardcoded local connection
-  string. Do not run it against any shared database, and do not use it as a
-  migration mechanism.
+- Matching creates circles as `forming` with `invited` members. Members accept
+  or decline; the circle becomes `active` once three members have accepted. If
+  every invitee answers and fewer than three accepted, the circle is archived
+  and the remaining members return to the matching pool. `requireMember` allows
+  active members of a `forming` circle to keep chatting and voting while they
+  wait for the remaining invitations.
+- `scripts/apply-migration.mjs` is a one-off that reads `DATABASE_URL`. Do not
+  run it against any shared database, and do not use it as a migration
+  mechanism.
 - `.env.example` starts with a stray `[TEMPLATE]` line; drop it when copying to
   `.env`.
 - Do not read, print, or commit `.env` values. Do not add secrets to the repo.

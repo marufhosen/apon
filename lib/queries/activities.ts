@@ -1,11 +1,12 @@
 import "server-only";
 
-import { and, asc, desc, eq, gte, inArray, lte, notInArray, sql, type SQL } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, lte, notInArray, or, sql, type SQL } from "drizzle-orm";
 
 import { db } from "@/lib/db";
 import {
   activities,
   areas,
+  blocks,
   interests,
   rsvps,
   userInterests,
@@ -355,8 +356,36 @@ export interface Attendee {
   checkedIn: boolean;
 }
 
-/** Attendee list — visible to the host of the activity and admins. */
-export async function getActivityAttendees(activityId: number): Promise<Attendee[]> {
+/**
+ * Attendee list, scoped to the viewer.
+ *
+ * Hosts and admins see every RSVP (including waitlist/cancelled) for check-in.
+ * A confirmed attendee sees only the other confirmed attendees. Everyone else
+ * gets no identities at all — the public count already comes from
+ * `getActivityDetail`.
+ */
+export async function getActivityAttendees(
+  activityId: number,
+  viewerId: string,
+  viewerRole: string,
+): Promise<Attendee[]> {
+  const [activity] = await db
+    .select({ hostId: activities.hostId })
+    .from(activities)
+    .where(eq(activities.id, activityId))
+    .limit(1);
+  if (!activity) return [];
+
+  const privileged = viewerRole === "admin" || activity.hostId === viewerId;
+  if (!privileged) {
+    const [mine] = await db
+      .select({ status: rsvps.status })
+      .from(rsvps)
+      .where(and(eq(rsvps.activityId, activityId), eq(rsvps.userId, viewerId)))
+      .limit(1);
+    if (mine?.status !== "going") return [];
+  }
+
   const rows = await db
     .select({
       userId: rsvps.userId,
@@ -367,10 +396,24 @@ export async function getActivityAttendees(activityId: number): Promise<Attendee
     })
     .from(rsvps)
     .innerJoin(users, eq(rsvps.userId, users.id))
-    .where(eq(rsvps.activityId, activityId))
+    .where(
+      and(
+        eq(rsvps.activityId, activityId),
+        privileged ? undefined : eq(rsvps.status, "going"),
+      ),
+    )
     .orderBy(asc(rsvps.status), asc(users.name));
 
-  return rows;
+  // Never reveal someone the viewer blocked (or who blocked the viewer).
+  const blockRows = await db
+    .select({ blockerId: blocks.blockerId, blockedId: blocks.blockedId })
+    .from(blocks)
+    .where(or(eq(blocks.blockerId, viewerId), eq(blocks.blockedId, viewerId)));
+  const blockedIds = new Set(
+    blockRows.map((b) => (b.blockerId === viewerId ? b.blockedId : b.blockerId)),
+  );
+
+  return rows.filter((row) => !blockedIds.has(row.userId));
 }
 
 /** Venues a host may book — approved and public only. */

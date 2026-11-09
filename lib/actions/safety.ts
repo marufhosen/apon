@@ -2,7 +2,7 @@
 
 import "server-only";
 
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 
 import { ActionError, type ActionContext, createAction } from "@/lib/actions/action";
 import { db } from "@/lib/db";
@@ -84,20 +84,9 @@ export const blockAction = createAction({
       await db.insert(blocks).values({ blockerId: user.id, blockedId: input.userId });
     }
 
-    // Leaving any shared circle keeps the two apart from now on.
-    await db.execute(sql`
-      update circle_members cm set status = 'left', left_at = now()
-      where cm.status = 'active'
-        and cm.user_id in (${user.id}, ${input.userId})
-        and exists (
-          select 1 from circle_members other
-          where other.circle_id = cm.circle_id
-            and other.user_id in (${user.id}, ${input.userId})
-            and other.status = 'active'
-            and other.user_id <> cm.user_id
-        )
-    `);
-
+    // A block must never silently remove either person from a circle they
+    // already belong to. Existing memberships stay intact; matching excludes
+    // the pair from future circles and reads hide their content from each other.
     return { blocked: true };
   },
 });

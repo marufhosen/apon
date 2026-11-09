@@ -7,7 +7,7 @@ import { markAllRead, markRead } from "@/lib/notify";
 
 /** Notification centre: mark one, or clear the whole backlog. */
 export const markAllReadAction = createAction({
-  revalidate: ["/home", "/"],
+  revalidate: ["/notifications", "/home", "/"],
   handler: async (_input, { user }: ActionContext) => {
     await markAllRead(user.id);
     return { done: true };
@@ -21,5 +21,5 @@ export const markReadAction = createAction({
     await markRead(id, user.id);
     return { done: true };
   },
-  revalidate: ["/home", "/"],
+  revalidate: ["/notifications", "/home", "/"],
 });

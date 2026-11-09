@@ -150,6 +150,7 @@ export function sendAccountExistsEmail(input: { to: string; locale: string }) {
 export function sendCircleInviteEmail(input: {
   to: string;
   locale: string;
+  circleId: number;
   circleName: string;
   memberCount: number;
 }) {
@@ -163,6 +164,7 @@ export function sendCircleInviteEmail(input: {
       <EmailLayout
         preview={bn ? "আপনার নতুন সার্কেল অপেক্ষা করছে" : "You have been invited to a circle"}
         heading={input.circleName}
+        footer={`${bn ? "নোটিফিকেশন সেটিংস" : "Notification settings"}: ${appUrl()}/${bn ? "bn" : "en"}/settings`}
       >
         <EmailParagraph>
           {bn
@@ -170,7 +172,7 @@ export function sendCircleInviteEmail(input: {
             : `A small circle of ${input.memberCount} people has been formed around your interests and availability. Start by picking the day that works for everyone.`}
         </EmailParagraph>
         <EmailButton
-          href={`${appUrl()}/circles`}
+          href={`${appUrl()}/${bn ? "bn" : "en"}/circles/${input.circleId}`}
           label={bn ? "সার্কেল দেখুন" : "Open your circle"}
         />
       </EmailLayout>
@@ -193,6 +195,7 @@ export function sendActivityReminderEmail(input: {
       <EmailLayout
         preview={input.title}
         heading={input.title}
+        footer={`${bn ? "নোটিফিকেশন সেটিংস" : "Notification settings"}: ${appUrl()}/${bn ? "bn" : "en"}/settings`}
       >
         <EmailParagraph>
           {bn ? "আপনি যাচ্ছেন:" : "You are going:"} {input.when}
@@ -202,7 +205,10 @@ export function sendActivityReminderEmail(input: {
             {bn ? "ঠিকানা:" : "Address:"} {input.address}
           </EmailParagraph>
         ) : null}
-        <EmailButton href={`${appUrl()}/activities`} label={bn ? "বিস্তারিত দেখুন" : "View details"} />
+        <EmailButton
+          href={`${appUrl()}/${bn ? "bn" : "en"}/activities`}
+          label={bn ? "বিস্তারিত দেখুন" : "View details"}
+        />
       </EmailLayout>
     ),
   });
@@ -224,6 +230,7 @@ export function sendWaitlistPromotionEmail(input: {
       <EmailLayout
         preview={input.title}
         heading={bn ? "আপনার আসন নিশ্চিত!" : "You are in!"}
+        footer={`${bn ? "নোটিফিকেশন সেটিংস" : "Notification settings"}: ${appUrl()}/${bn ? "bn" : "en"}/settings`}
       >
         <EmailParagraph>
           {bn
@@ -231,7 +238,10 @@ export function sendWaitlistPromotionEmail(input: {
             : `A spot opened up for "${input.title}" and you have been moved from the waitlist.`}
         </EmailParagraph>
         <EmailParagraph>{input.when}</EmailParagraph>
-        <EmailButton href={`${appUrl()}/activities`} label={bn ? "আয়োজনটি দেখুন" : "View activity"} />
+        <EmailButton
+          href={`${appUrl()}/${bn ? "bn" : "en"}/activities`}
+          label={bn ? "আয়োজনটি দেখুন" : "View activity"}
+        />
       </EmailLayout>
     ),
   });
@@ -260,7 +270,10 @@ export function sendHostApprovalEmail(input: { to: string; locale: string; appro
               ? "দুঃখিত, এবার আপনার আবেদনটি অনুমোদন করা গেল না। কিছুদিন পর আবার আবেদন করতে পারবেন।"
               : "Unfortunately we can't approve your application at this time. You are welcome to apply again later."}
         </EmailParagraph>
-        <EmailButton href={`${appUrl()}/host`} label={bn ? "হোস্ট ড্যাশবোর্ড" : "Host dashboard"} />
+        <EmailButton
+          href={`${appUrl()}/${bn ? "bn" : "en"}/host`}
+          label={bn ? "হোস্ট ড্যাশবোর্ড" : "Host dashboard"}
+        />
       </EmailLayout>
     ),
   });
@@ -280,13 +293,17 @@ export function sendFeedbackRequestEmail(input: {
       <EmailLayout
         preview={input.title}
         heading={bn ? "কেমন লাগল?" : "How did it go?"}
+        footer={`${bn ? "নোটিফিকেশন সেটিংস" : "Notification settings"}: ${appUrl()}/${bn ? "bn" : "en"}/settings`}
       >
         <EmailParagraph>
           {bn
             ? `“${input.title}” শেষ হয়েছে। তিনটি ছোট প্রশ্নের উত্তর দিতে এক মিনিট সময় দিন — আপনার উত্তর অন্য কেউ দেখবে না।`
             : `"${input.title}" has wrapped up. Take a minute to answer three questions — they stay private.`}
         </EmailParagraph>
-        <EmailButton href={`${appUrl()}/activities`} label={bn ? "মতামত দিন" : "Give feedback"} />
+        <EmailButton
+          href={`${appUrl()}/${bn ? "bn" : "en"}/activities`}
+          label={bn ? "মতামত দিন" : "Give feedback"}
+        />
       </EmailLayout>
     ),
   });

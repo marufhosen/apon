@@ -160,6 +160,18 @@ export async function getNotificationPrefs(userId: string) {
   );
 }
 
+export type EmailPreference =
+  | "emailCircleInvites"
+  | "emailActivityReminders"
+  | "emailFeedbackRequests"
+  | "emailGeneral";
+
+/** Whether a transactional email of this kind is enabled for the member. */
+export async function emailAllowed(userId: string, key: EmailPreference): Promise<boolean> {
+  const prefs = await getNotificationPrefs(userId);
+  return prefs[key];
+}
+
 export { sql };
 
 /** True when the user has a password (credential account) — legacy code-only accounts don't. */

@@ -2,7 +2,7 @@
 
 import "server-only";
 
-import { eq, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 
 import { ActionError, type ActionContext, createAction } from "@/lib/actions/action";
 import { db } from "@/lib/db";
@@ -10,15 +10,20 @@ import { assertSelectableLocation } from "@/lib/queries/locations";
 import { cleanupReplacedImage, resolveOwnedImage } from "@/lib/uploads/server";
 import {
   activities,
+  circleMessages,
+  circleRequests,
   hostApplications,
   reports,
+  rsvps,
   users,
   venues,
 } from "@/lib/db/schema";
 import {
   activityReviewSchema,
   adminUserUpdateSchema,
+  circleRequestResolutionSchema,
   hostApplicationReviewSchema,
+  moderateMessageSchema,
   reportResolutionSchema,
   venueSchema,
 } from "@/lib/validations";
@@ -100,6 +105,42 @@ export const resolveReport = createAction({
   },
 });
 
+/** Hide the exact message named in a report (never the surrounding chat). */
+export const hideReportedMessage = createAction({
+  schema: moderateMessageSchema,
+  authorize: "admin",
+  revalidate: ["/admin/reports", "/circles", "/notifications"],
+  handler: async (input, { user }: ActionContext) => {
+    void user;
+    const [message] = await db
+      .select({
+        id: circleMessages.id,
+        circleId: circleMessages.circleId,
+        userId: circleMessages.userId,
+      })
+      .from(circleMessages)
+      .where(eq(circleMessages.id, input.messageId))
+      .limit(1);
+    if (!message) throw new ActionError("errors.notFoundTitle");
+
+    await db
+      .update(circleMessages)
+      .set({ hiddenAt: new Date() })
+      .where(eq(circleMessages.id, input.messageId));
+
+    await notify({
+      userId: message.userId,
+      type: "report_update",
+      title: "A message was hidden by a moderator",
+      body: "A message you posted in a circle was hidden after a report.",
+      href: `/circles/${message.circleId}`,
+      payload: { circleId: message.circleId, messageId: message.id },
+    });
+
+    return { hidden: true };
+  },
+});
+
 /** Approve or reject a host application (grants/reviews the host role). */
 export const reviewHostApplication = createAction({
   schema: hostApplicationReviewSchema,
@@ -169,6 +210,16 @@ export const reviewActivity = createAction({
     const activity = rows[0];
     if (!activity) throw new ActionError("errors.notFoundTitle");
 
+    const allowedFrom: Record<typeof input.action, string[]> = {
+      approve: ["pending"],
+      reject: ["pending"],
+      cancel: ["pending", "approved"],
+      complete: ["approved"],
+    };
+    if (!allowedFrom[input.action].includes(activity.status)) {
+      throw new ActionError("errors.validation");
+    }
+
     const status =
       input.action === "approve"
         ? "approved"
@@ -184,6 +235,39 @@ export const reviewActivity = createAction({
         cancellationReason: input.action === "reject" ? "Not approved by admin" : activity.cancellationReason,
       })
       .where(eq(activities.id, input.activityId));
+
+    if (status === "cancelled") {
+      const attendees = await db
+        .select({ userId: rsvps.userId })
+        .from(rsvps)
+        .where(
+          and(
+            eq(rsvps.activityId, input.activityId),
+            inArray(rsvps.status, ["going", "waitlist"]),
+          ),
+        );
+
+      await db
+        .update(rsvps)
+        .set({ status: "cancelled", checkedIn: false, updatedAt: new Date() })
+        .where(
+          and(
+            eq(rsvps.activityId, input.activityId),
+            inArray(rsvps.status, ["going", "waitlist"]),
+          ),
+        );
+
+      for (const attendee of attendees) {
+        await notify({
+          userId: attendee.userId,
+          type: "activity_reminder",
+          title: activity.title,
+          body: "Cancelled",
+          href: `/activities/${activity.id}`,
+          payload: { activityId: activity.id, cancelled: true },
+        });
+      }
+    }
 
     await notify({
       userId: activity.hostId,
@@ -251,6 +335,40 @@ export const deleteVenue = createAction({
       .where(eq(venues.id, id));
 
     return { deleted: true };
+  },
+});
+
+/** Mark a member's rematch request as handled. */
+export const resolveCircleRequest = createAction({
+  schema: circleRequestResolutionSchema,
+  authorize: "admin",
+  revalidate: ["/admin/circles", "/admin", "/notifications"],
+  handler: async (input, { user }: ActionContext) => {
+    void user;
+    const rows = await db
+      .select()
+      .from(circleRequests)
+      .where(eq(circleRequests.id, input.requestId))
+      .limit(1);
+    const request = rows[0];
+    if (!request) throw new ActionError("errors.notFoundTitle");
+    if (request.status === "handled") return { status: "handled" };
+
+    await db
+      .update(circleRequests)
+      .set({ status: "handled" })
+      .where(eq(circleRequests.id, input.requestId));
+
+    await notify({
+      userId: request.userId,
+      type: "generic",
+      title: "Your rematch request was reviewed",
+      body: "We will take it into account in the next matching run.",
+      href: "/circles",
+      payload: { circleRequestId: input.requestId },
+    });
+
+    return { status: "handled" };
   },
 });
 

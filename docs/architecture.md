@@ -169,15 +169,17 @@ Matching is split in two:
 
 ### Circle lifecycle
 
-Members can read the circle, chat, vote in the latest poll and leave. Leaving
-marks the membership `left` and demotes the circle to `forming` when fewer than 3
-active members remain. All circle reads and actions require
-`circles.status = 'active'`.
+The matching run creates a circle as `forming` and each member as `invited`.
+Invited members see the invitation on `/circles` and `/circles/:id`; accepting
+marks them `active`, declining marks them `declined`. The circle becomes
+`active` when at least three members have accepted. While invitations are still
+pending, active members of a `forming` circle can already chat and vote.
 
-> **Known gap:** the matching run creates circles as `forming`, while
-> `getMyCircle`, `requireMember` and the circle actions require `active`. No code
-> path currently promotes `forming → active`; only seeded circles are active. Fix
-> this before relying on the lifecycle end-to-end.
+Leaving marks the membership `left`. If fewer than three active members remain
+and invitations are still pending, the circle returns to `forming`; if nobody is
+left to answer, it is archived and the remaining members return to the matching
+pool. All circle reads and actions require an `active` membership on a
+non-archived, non-deleted circle.
 
 ### Activities and RSVP
 

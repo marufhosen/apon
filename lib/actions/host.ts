@@ -3,7 +3,7 @@
 import { z } from "zod";
 import "server-only";
 
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 
 import { ActionError, type ActionContext, createAction } from "@/lib/actions/action";
 import { db } from "@/lib/db";
@@ -138,14 +138,6 @@ export const updateActivity = createAction({
   handler: async (input, { user }: ActionContext) => {
     assertHostRole(user.role);
 
-    const rows = await db.select().from(activities).where(eq(activities.id, input.id)).limit(1);
-    const activity = rows[0];
-    if (!activity) throw new ActionError("errors.notFoundTitle");
-    const nextImage = await resolveOwnedImage(user.id, input.imageUrl, "activity_cover", activity.imageUrl);
-    if (activity.hostId !== user.id && user.role !== "admin") {
-      throw new ActionError("errors.unauthorized");
-    }
-
     const venueRows = await db.select().from(venues).where(eq(venues.id, input.venueId)).limit(1);
     const venue = venueRows[0];
     if (!venue || !venue.approved || !venue.isPublic) {
@@ -155,27 +147,64 @@ export const updateActivity = createAction({
     const startsAt = new Date(`${input.date}T${input.startTime}:00+06:00`);
     const endsAt = new Date(`${input.date}T${input.endTime}:00+06:00`);
 
-    await db
-      .update(activities)
-      .set({
-        title: input.title,
-        description: input.description,
-        categoryInterestId: input.categoryInterestId,
-        venueId: venue.id,
-        areaId: venue.areaId,
-        startsAt,
-        endsAt,
-        capacity: input.capacity,
-        costBdt: input.costBdt,
-        imageUrl: nextImage,
-        womenOnly: input.womenOnly,
-        // Host edits to a live activity go back into review.
-        status: activity.status === "approved" ? "pending" : activity.status,
-        updatedAt: new Date(),
-      })
-      .where(eq(activities.id, input.id));
-    await cleanupReplacedImage(activity.imageUrl, nextImage);
+    const result = await db.transaction(async (tx) => {
+      const rows = await tx
+        .select()
+        .from(activities)
+        .where(eq(activities.id, input.id))
+        .for("update")
+        .limit(1);
+      const activity = rows[0];
+      if (!activity) throw new ActionError("errors.notFoundTitle");
+      if (activity.hostId !== user.id && user.role !== "admin") {
+        throw new ActionError("errors.unauthorized");
+      }
+      if (activity.status === "cancelled" || activity.status === "completed") {
+        throw new ActionError("errors.unauthorized");
+      }
 
+      // Capacity can never be reduced below the number of confirmed attendees.
+      const [going] = await tx
+        .select({ count: sql<number>`count(*)`.mapWith(Number) })
+        .from(rsvps)
+        .where(and(eq(rsvps.activityId, input.id), eq(rsvps.status, "going")));
+      if ((going?.count ?? 0) > input.capacity) {
+        throw new ActionError("host.form.capacityBelowGoing", {
+          capacity: ["host.form.capacityBelowGoing"],
+        });
+      }
+
+      const nextImage = await resolveOwnedImage(
+        user.id,
+        input.imageUrl,
+        "activity_cover",
+        activity.imageUrl,
+      );
+
+      await tx
+        .update(activities)
+        .set({
+          title: input.title,
+          description: input.description,
+          categoryInterestId: input.categoryInterestId,
+          venueId: venue.id,
+          areaId: venue.areaId,
+          startsAt,
+          endsAt,
+          capacity: input.capacity,
+          costBdt: input.costBdt,
+          imageUrl: nextImage,
+          womenOnly: input.womenOnly,
+          // Host edits to a live activity go back into review.
+          status: activity.status === "approved" ? "pending" : activity.status,
+          updatedAt: new Date(),
+        })
+        .where(eq(activities.id, input.id));
+
+      return { previousImage: activity.imageUrl, nextImage };
+    });
+
+    await cleanupReplacedImage(result.previousImage, result.nextImage);
     return { activityId: input.id };
   },
 });
@@ -190,38 +219,58 @@ export const cancelActivity = createAction({
   handler: async (input, { user }: ActionContext) => {
     assertHostRole(user.role);
 
-    const rows = await db.select().from(activities).where(eq(activities.id, input.id)).limit(1);
-    const activity = rows[0];
-    if (!activity) throw new ActionError("errors.notFoundTitle");
-    if (activity.hostId !== user.id && user.role !== "admin") {
-      throw new ActionError("errors.unauthorized");
-    }
+    const outcome = await db.transaction(async (tx) => {
+      const rows = await tx
+        .select()
+        .from(activities)
+        .where(eq(activities.id, input.id))
+        .for("update")
+        .limit(1);
+      const activity = rows[0];
+      if (!activity) throw new ActionError("errors.notFoundTitle");
+      if (activity.hostId !== user.id && user.role !== "admin") {
+        throw new ActionError("errors.unauthorized");
+      }
+      if (activity.status === "cancelled" || activity.status === "completed") {
+        return { activity, attendees: [], cancelled: false };
+      }
 
-    await db
-      .update(activities)
-      .set({ status: "cancelled", updatedAt: new Date() })
-      .where(eq(activities.id, input.id));
+      const attendees = await tx
+        .select({ user: users })
+        .from(rsvps)
+        .innerJoin(users, eq(rsvps.userId, users.id))
+        .where(
+          and(eq(rsvps.activityId, input.id), inArray(rsvps.status, ["going", "waitlist"])),
+        );
 
-    const attendees = await db
-      .select({ rsvp: rsvps, user: users })
-      .from(rsvps)
-      .innerJoin(users, eq(rsvps.userId, users.id))
-      .where(
-        and(eq(rsvps.activityId, input.id), inArray(rsvps.status, ["going", "waitlist"])),
-      );
+      await tx
+        .update(activities)
+        .set({ status: "cancelled", updatedAt: new Date() })
+        .where(eq(activities.id, input.id));
 
-    for (const a of attendees) {
+      // Keep the rows for history, but release every seat and the waitlist.
+      await tx
+        .update(rsvps)
+        .set({ status: "cancelled", checkedIn: false, updatedAt: new Date() })
+        .where(
+          and(eq(rsvps.activityId, input.id), inArray(rsvps.status, ["going", "waitlist"])),
+        );
+
+      return { activity, attendees, cancelled: true };
+    });
+
+    for (const a of outcome.attendees) {
       await notify({
         userId: a.user.id,
         type: "activity_reminder",
-        title: activity.title,
+        title: outcome.activity.title,
         body: "Cancelled",
-        href: `/activities/${activity.id}`,
-        payload: { activityId: activity.id, cancelled: true },
+        href: `/activities/${outcome.activity.id}`,
+        payload: { activityId: outcome.activity.id, cancelled: true },
       });
     }
 
-    return { cancelled: true, notified: attendees.length };
+    return { cancelled: outcome.cancelled, notified: outcome.attendees.length };
   },
 });
 
@@ -246,7 +295,13 @@ export const toggleCheckin = createAction({
     const rsvpRows = await db
       .select()
       .from(rsvps)
-      .where(and(eq(rsvps.activityId, input.activityId), eq(rsvps.userId, input.userId)))
+      .where(
+        and(
+          eq(rsvps.activityId, input.activityId),
+          eq(rsvps.userId, input.userId),
+          eq(rsvps.status, "going"),
+        ),
+      )
       .limit(1);
 
     if (!rsvpRows.length) throw new ActionError("errors.notFoundTitle");

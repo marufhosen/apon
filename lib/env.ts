@@ -89,6 +89,12 @@ export const cloudinaryConfig = (() => {
 /** True when uploads can be sent to Cloudinary. */
 export const uploadsEnabled = cloudinaryConfig !== null;
 
+if (env.NODE_ENV === "production" && env.SMS_PROVIDER === "console") {
+  console.warn(
+    "[env] SMS_PROVIDER=console in production: phone OTP delivery will fail. Set SMS_PROVIDER=twilio with credentials.",
+  );
+}
+
 if (!uploadsEnabled && env.CLOUDINARY_API_KEY && env.NODE_ENV !== "test") {
   console.warn(
     "[env] CLOUDINARY_API_KEY is set but uploads are disabled: also set CLOUDINARY_API_SECRET and " +

@@ -2,12 +2,12 @@
 
 import "server-only";
 
-import { eq, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 
 import { ActionError, type ActionContext, createAction } from "@/lib/actions/action";
 import { db } from "@/lib/db";
 import { assertSelectableLocation } from "@/lib/queries/locations";
-import { cleanupReplacedImage, deleteUserPublicUploads, resolveOwnedImage } from "@/lib/uploads/server";
+import { cleanupReplacedImage, deleteUserUploads, resolveOwnedImage } from "@/lib/uploads/server";
 import {
   activities,
   availability,
@@ -26,6 +26,7 @@ import {
   profileSchema,
   settingsSchema,
 } from "@/lib/validations";
+import { notify } from "@/lib/notify";
 
 /** Edit public profile fields. */
 export const updateProfile = createAction({
@@ -92,6 +93,16 @@ export const deleteAccount = createAction({
   handler: async (input, { user }: ActionContext) => {
     if (input.confirm !== "DELETE") throw new ActionError("settings.deleteError");
 
+    const hosted = await db
+      .select({ id: activities.id, title: activities.title })
+      .from(activities)
+      .where(
+        and(
+          eq(activities.hostId, user.id),
+          inArray(activities.status, ["pending", "approved"]),
+        ),
+      );
+
     await db.transaction(async (tx) => {
       await tx.delete(userInterests).where(eq(userInterests.userId, user.id));
       await tx.delete(availability).where(eq(availability.userId, user.id));
@@ -121,6 +132,8 @@ export const deleteAccount = createAction({
         .set({
           name: "Deleted member",
           email: `deleted+${user.id}@bondhu.invalid`,
+          username: null,
+          displayUsername: null,
           bio: null,
           avatarUrl: null,
           phoneNumber: null,
@@ -139,8 +152,28 @@ export const deleteAccount = createAction({
       await tx.execute(sql`delete from accounts where user_id = ${user.id}`);
     });
 
-    // After the transaction commits: remove their public images from Cloudinary.
-    await deleteUserPublicUploads(user.id);
+    // After the transaction commits: remove their uploads (public images still
+    // referenced by retained activity/venue records are kept).
+    await deleteUserUploads(user.id);
+
+    // The cancelled activities were already communicated in-app; this makes
+    // sure attendees are not left planning to attend a meetup that is gone.
+    for (const activity of hosted) {
+      const attendees = await db
+        .select({ userId: rsvps.userId })
+        .from(rsvps)
+        .where(eq(rsvps.activityId, activity.id));
+      for (const attendee of attendees) {
+        await notify({
+          userId: attendee.userId,
+          type: "generic",
+          title: activity.title,
+          body: "This activity was cancelled because the host deleted their account.",
+          href: `/activities/${activity.id}`,
+          payload: { activityId: activity.id, cancelled: true },
+        });
+      }
+    }
 
     return { deleted: true };
   },

@@ -47,11 +47,10 @@ export default async function ActivityDetailPage({ params, searchParams }: Props
   const activityId = Number(id);
   if (!Number.isFinite(activityId)) notFound();
 
-  const [activity, t, tFb, attendees] = await Promise.all([
+  const [activity, t, tFb] = await Promise.all([
     getActivityDetail(activityId, user?.id),
     getTranslations("activities"),
     getTranslations("feedback"),
-    getActivityAttendees(activityId),
   ]);
   if (!activity) notFound();
 
@@ -72,6 +71,12 @@ export default async function ActivityDetailPage({ params, searchParams }: Props
     user?.status === "active";
 
   const needsPhone = Boolean(user) && !user?.phoneNumberVerified;
+
+  // Only the host, admins and confirmed attendees may see who else is coming.
+  const attendees =
+    user && (isHost || myStatus === "going")
+      ? await getActivityAttendees(activityId, user.id, user.role)
+      : [];
 
   // Private feedback: only for people who actually attended.
   let myFeedback: (typeof feedback.$inferSelect) | null = null;

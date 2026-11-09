@@ -26,10 +26,11 @@ export async function getMyCircle(userId: string) {
       and(
         eq(circleMembers.userId, userId),
         inArray(circleMembers.status, ["invited", "active"]),
-        eq(circles.status, "active"),
+        inArray(circles.status, ["forming", "active"]),
         sql`${circles.deletedAt} is null`,
       ),
     )
+    .orderBy(sql`case when ${circles.status} = 'active' then 0 else 1 end`, desc(circles.createdAt))
     .limit(1);
 
   const row = membership[0];

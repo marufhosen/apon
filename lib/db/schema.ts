@@ -70,9 +70,10 @@ export const users = pgTable(
     deletedAt: timestamp("deleted_at", tz),
   },
   (t) => [
+    uniqueIndex("users_email_unique").on(sql`lower(${t.email})`),
+    uniqueIndex("users_phone_unique").on(t.phoneNumber),
     index("users_area_idx").on(t.areaId),
     index("users_status_idx").on(t.status),
-    index("users_phone_idx").on(t.phoneNumber),
   ],
 );
 
@@ -115,14 +116,18 @@ export const accounts = pgTable(
   (t) => [index("accounts_user_idx").on(t.userId)],
 );
 
-export const verifications = pgTable("verifications", {
-  id: text("id").primaryKey(),
-  identifier: text("identifier").notNull(),
-  value: text("value").notNull(),
-  expiresAt: timestamp("expires_at", tz).notNull(),
-  createdAt: createdAt(),
-  updatedAt: updatedAt(),
-});
+export const verifications = pgTable(
+  "verifications",
+  {
+    id: text("id").primaryKey(),
+    identifier: text("identifier").notNull(),
+    value: text("value").notNull(),
+    expiresAt: timestamp("expires_at", tz).notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [index("verifications_identifier_idx").on(t.identifier)],
+);
 
 /** Better Auth's DB-backed rate limiter (`rateLimit.storage: "db"`). */
 export const rateLimitBuckets = pgTable("rate_limits", {
@@ -367,7 +372,7 @@ export const pollVotes = pgTable(
     createdAt: createdAt(),
   },
   (t) => [
-    uniqueIndex("poll_votes_unique").on(t.pollId, t.userId),
+    uniqueIndex("poll_votes_unique").on(t.pollId, t.userId, t.optionId),
     index("poll_votes_option_idx").on(t.optionId),
   ],
 );

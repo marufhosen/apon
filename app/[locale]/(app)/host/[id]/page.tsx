@@ -41,7 +41,7 @@ export default async function HostActivityPage({
   const [t, th, attendees] = await Promise.all([
     getTranslations("activities.checkin"),
     getTranslations("host"),
-    getActivityAttendees(activityId),
+    getActivityAttendees(activityId, user.id, user.role),
   ]);
 
   const { activity, venue, area } = row;

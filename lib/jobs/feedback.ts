@@ -7,6 +7,7 @@ import { db } from "@/lib/db";
 import { activities, feedback, notifications, rsvps, users } from "@/lib/db/schema";
 import { sendFeedbackRequestEmail } from "@/lib/email";
 import { notify } from "@/lib/notify";
+import { emailAllowed } from "@/lib/queries/users";
 
 /**
  * Asks everyone who attended a just-finished activity for private feedback.
@@ -64,11 +65,13 @@ export async function requestFeedbackForCompleted(): Promise<{ sent: number }> {
         payload: { activityId: activity.id },
       });
 
-      await sendFeedbackRequestEmail({
-        to: attendee.user.email,
-        locale: attendee.user.locale,
-        title: activity.title,
-      }).catch((err) => console.error("[feedback] email failed", err));
+      if (await emailAllowed(attendee.user.id, "emailFeedbackRequests")) {
+        await sendFeedbackRequestEmail({
+          to: attendee.user.email,
+          locale: attendee.user.locale,
+          title: activity.title,
+        }).catch((err) => console.error("[feedback] email failed", err));
+      }
 
       sent++;
     }

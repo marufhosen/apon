@@ -11,6 +11,7 @@ import { rsvpSchema } from "@/lib/validations";
 import { pickPromotion, resolveRsvpStatus, toRsvpStatus } from "@/lib/rsvp/waitlist";
 import { sendWaitlistPromotionEmail } from "@/lib/email";
 import { notify } from "@/lib/notify";
+import { emailAllowed } from "@/lib/queries/users";
 
 export interface RsvpResult {
   status: "going" | "waitlist" | "cancelled";
@@ -154,12 +155,14 @@ export const rsvpAction = createAction({
         href: `/activities/${outcome.promoted.activityId}`,
         payload: { activityId: outcome.promoted.activityId },
       });
-      await sendWaitlistPromotionEmail({
-        to: outcome.promoted.email,
-        locale: outcome.promoted.locale,
-        title: outcome.promoted.title,
-        when: outcome.promoted.startsAt.toISOString(),
-      }).catch((err) => console.error("[rsvp] promotion email failed", err));
+      if (await emailAllowed(outcome.promoted.userId, "emailActivityReminders")) {
+        await sendWaitlistPromotionEmail({
+          to: outcome.promoted.email,
+          locale: outcome.promoted.locale,
+          title: outcome.promoted.title,
+          when: outcome.promoted.startsAt.toISOString(),
+        }).catch((err) => console.error("[rsvp] promotion email failed", err));
+      }
     }
 
     return { status: outcome.status };

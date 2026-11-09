@@ -7,6 +7,7 @@ import { db } from "@/lib/db";
 import { activities, areas, notifications, rsvps, users, venues } from "@/lib/db/schema";
 import { sendActivityReminderEmail } from "@/lib/email";
 import { notify } from "@/lib/notify";
+import { emailAllowed } from "@/lib/queries/users";
 
 /**
  * 24-hour reminders for upcoming activities.
@@ -72,13 +73,15 @@ export async function sendUpcomingReminders(): Promise<{ sent: number }> {
         payload: { activityId: row.activity.id },
       });
 
-      await sendActivityReminderEmail({
-        to: attendee.user.email,
-        locale: attendee.user.locale,
-        title: row.activity.title,
-        when: format(row.activity.startsAt, "EEE d MMM, HH:mm"),
-        address: attendee.rsvp.checkedIn || row.venueAddress ? (row.venueName ?? undefined) : undefined,
-      }).catch((err) => console.error("[reminders] email failed", err));
+      if (await emailAllowed(attendee.user.id, "emailActivityReminders")) {
+        await sendActivityReminderEmail({
+          to: attendee.user.email,
+          locale: attendee.user.locale,
+          title: row.activity.title,
+          when: format(row.activity.startsAt, "EEE d MMM, HH:mm"),
+          address: row.venueAddress ?? undefined,
+        }).catch((err) => console.error("[reminders] email failed", err));
+      }
 
       sent++;
     }

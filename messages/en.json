@@ -578,6 +578,14 @@
     "send": "Send",
     "noMessages": "No messages yet. Say hello!",
     "hiddenMessage": "This message was hidden.",
+    "inviteTitle": "You're invited to this circle",
+    "inviteText": "Accept to join the group, meet the others and vote on a time.",
+    "acceptInvite": "Accept invitation",
+    "declineInvite": "Decline",
+    "inviteAccepted": "You're in the circle.",
+    "inviteDeclined": "Invitation declined.",
+    "formingNotice": "This circle is still forming. It becomes active when at least 3 people accept.",
+    "joinToParticipate": "Accept your invitation to join the chat and vote.",
     "leave": "Leave circle",
     "leaveTitle": "Leave this circle?",
     "leaveText": "You will stop receiving updates from this circle. You can request a new one afterwards.",
@@ -646,6 +654,7 @@
       "created": "Activity submitted for approval.",
       "updated": "Activity updated.",
       "publishNote": "New activities start as pending and go live after an admin approves them.",
+      "capacityBelowGoing": "Capacity cannot be lower than the number of confirmed attendees.",
       "errors": "Please fix the highlighted fields."
     },
     "status": {
@@ -729,7 +738,7 @@
     },
     "block": {
       "title": "Block {name}?",
-      "text": "You will not share a circle or activities with them, and their messages will be hidden from you.",
+      "text": "You will not be matched into new circles together, and their messages will be hidden from you.",
       "confirm": "Block",
       "done": "{name} is blocked.",
       "unblock": "Undo"
@@ -832,7 +841,15 @@
       "note": "Resolution note (internal)",
       "resolved": "Report updated.",
       "empty": "No open reports. Nice.",
-      "statusFilter": "Filter by status"
+      "statusFilter": "Filter by status",
+      "targetPreview": "Reported content",
+      "messageBy": "By {name} in {circle}",
+      "alreadyHidden": "Already hidden",
+      "openCircle": "Open circle",
+      "hostedBy": "Hosted by {name}",
+      "missingTarget": "The reported content no longer exists.",
+      "hideMessage": "Hide message",
+      "hideMessageDone": "Message hidden."
     },
     "hosts": {
       "title": "Host applications",
@@ -894,6 +911,8 @@
       "empty": "No circles yet.",
       "formAction": "Open",
       "request": "Rematch requests",
+      "markHandled": "Mark handled",
+      "requestHandled": "Request marked as handled.",
       "back": "All circles",
       "status": "Status",
       "statusForming": "Forming",

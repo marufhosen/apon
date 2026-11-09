@@ -6,6 +6,7 @@ import { requireAdmin } from "@/lib/session";
 import { listCircles } from "@/lib/queries/circles";
 import { listOpenCircleRequests } from "@/lib/queries/admin";
 import { RerunMatchingButton } from "@/components/features/admin/rerun-matching-button";
+import { ResolveRequestButton } from "@/components/features/admin/resolve-request-button";
 import { EmptyState } from "@/components/features/shared/empty-state";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -102,9 +103,10 @@ export default async function AdminCirclesPage() {
                   <span className="text-muted-foreground">
                     {request.reason ?? "—"}
                   </span>
-                  <span className="ml-auto text-xs text-muted-foreground">
+                  <span className="text-xs text-muted-foreground">
                     {new Date(request.createdAt).toISOString().slice(0, 10)}
                   </span>
+                  <ResolveRequestButton requestId={request.id} />
                 </li>
               ))}
             </ul>
